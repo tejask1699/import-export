@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Map - AI Shipping System</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .demo-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .demo-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .demo-header h1 {
+            color: #0f4c75;
+            margin-bottom: 10px;
+        }
+        .map-container {
+            height: 500px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            background: linear-gradient(45deg, #e3f2fd, #bbdefb);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .demo-map {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .route-line {
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            width: 80%;
+            height: 4px;
+            background: #3282b8;
+            transform: translateY(-50%);
+            border-radius: 2px;
+        }
+        .marker {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .marker-origin {
+            left: 5%;
+            background: #28a745;
+        }
+        .marker-destination {
+            right: 5%;
+            background: #dc3545;
+        }
+        .marker-current {
+            left: 45%;
+            background: #ffc107;
+            animation: moveTruck 8s infinite;
+        }
+        @keyframes moveTruck {
+            0% { left: 10%; }
+            50% { left: 50%; }
+            100% { left: 85%; }
+        }
+        .info-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3282b8;
+        }
+        .info-panel h3 {
+            margin-top: 0;
+            color: #0f4c75;
+        }
+        .tracking-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .info-item {
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .info-item strong {
+            color: #0f4c75;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .setup-instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+        }
+        .setup-instructions h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .setup-instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .setup-instructions li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🗺️ Live Shipment Tracking Demo</h1>
+            <p>This is a demonstration of the tracking system without requiring Google Maps API key</p>
+        </div>
+
+        <div class="map-container">
+            <div class="demo-map">
+                <div class="route-line"></div>
+                <div class="marker marker-origin">📍</div>
+                <div class="marker marker-current">🚚</div>
+                <div class="marker marker-destination">🎯</div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h3>📦 Shipment Information</h3>
+            <div class="tracking-info">
+                <div class="info-item">
+                    <strong>Tracking Number</strong>
+                    TRK-2024-1234
+                </div>
+                <div class="info-item">
+                    <strong>Route</strong>
+                    Mumbai → Delhi
+                </div>
+                <div class="info-item">
+                    <strong>Status</strong>
+                    <span style="color: #ffc107;">In Transit</span>
+                </div>
+                <div class="info-item">
+                    <strong>Progress</strong>
+                    45% Complete
+                </div>
+                <div class="info-item">
+                    <strong>Priority</strong>
+                    Express
+                </div>
+                <div class="info-item">
+                    <strong>ETA</strong>
+                    2-3 days
+                </div>
+            </div>
+        </div>
+
+        <div class="setup-instructions">
+            <h4>🔧 To Enable Real Google Maps:</h4>
+            <ol>
+                <li>Get a Google Maps API key from <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                <li>Enable "Maps JavaScript API" in your project</li>
+                <li>Replace <code>YOUR_GOOGLE_MAPS_API_KEY</code> in tracking.html line 511</li>
+                <li>Restart your Flask application</li>
+                <li>Visit <code>/tracking</code> to see the real Google Maps</li>
+            </ol>
+            <p><strong>Note:</strong> Google Maps has a free tier of 28,500 map loads per month.</p>
+        </div>
+    </div>
+
+    <script>
+        // Simulate live tracking updates
+        let progress = 45;
+        setInterval(() => {
+            progress += 1;
+            if (progress > 100) progress = 100;
+            
+            // Update progress display
+            const progressElements = document.querySelectorAll('.info-item');
+            progressElements.forEach(el => {
+                if (el.innerHTML.includes('Progress')) {
+                    el.innerHTML = `<strong>Progress</strong><span style="color: #28a745;">${progress}% Complete</span>`;
+                }
+            });
+            
+            // Update truck position
+            const truck = document.querySelector('.marker-current');
+            if (truck) {
+                const newPosition = 10 + (progress * 0.75);
+                truck.style.left = newPosition + '%';
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Tracking - AI Shipping System</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: linear-gradient(135deg, #0f4c75, #3282b8);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            color: #0f4c75;
+            margin: 0 0 10px 0;
+            font-size: 2.5rem;
+        }
+
+        .header p {
+            color: #666;
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .tracking-container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .map-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .map-section h3 {
+            color: #0f4c75;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+        }
+
+        .tracking-info {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .tracking-info h3 {
+            color: #0f4c75;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .shipment-card {
+            background: rgba(15, 76, 117, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3282b8;
+        }
+
+        .shipment-card.active {
+            border-left-color: #28a745;
+            background: rgba(40, 167, 69, 0.1);
+        }
+
+        .shipment-card h4 {
+            color: #0f4c75;
+            margin: 0 0 10px 0;
+        }
+
+        .shipment-details {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .shipment-details strong {
+            color: #0f4c75;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 10px;
+        }
+
+        .status-badge.in-transit {
+            background: #ffc107;
+            color: #856404;
+        }
+
+        .status-badge.delivered {
+            background: #28a745;
+            color: #fff;
+        }
+
+        .status-badge.pending {
+            background: #6c757d;
+            color: #fff;
+        }
+
+        .status-badge.delayed {
+            background: #dc3545;
+            color: #fff;
+        }
+
+        .tracking-controls {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+        }
+
+        .tracking-controls h3 {
+            color: #0f4c75;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .control-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: bold;
+            color: #0f4c75;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input, .form-group select {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #3282b8;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0f4c75, #3282b8);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #3282b8, #0f4c75);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            background: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        .weather-alert {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #0f4c75;
+            text-decoration: none;
+            font-weight: bold;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 1);
+        }
+
+        @media (max-width: 768px) {
+            .tracking-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .control-form {
+                grid-template-columns: 1fr;
+            }
+            
+            #map {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ Live Shipment Tracking</h1>
+            <p>Real-time GPS tracking with weather monitoring</p>
+        </div>
+
+        <div class="tracking-controls">
+            <h3>📍 Track Shipment</h3>
+            <form class="control-form" id="trackingForm">
+                <div class="form-group">
+                    <label for="trackingNumber">Tracking Number</label>
+                    <input type="text" id="trackingNumber" placeholder="Enter tracking number..." required>
+                </div>
+                <div class="form-group">
+                    <label for="shipmentStatus">Filter by Status</label>
+                    <select id="shipmentStatus">
+                        <option value="">All Shipments</option>
+                        <option value="pending">Pending</option>
+                        <option value="in-transit">In Transit</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="delayed">Delayed</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary">🔍 Track</button>
+            </form>
+        </div>
+
+        <div class="tracking-container">
+            <div class="map-section">
+                <h3>Live Map View <span class="live-indicator"><span class="live-dot"></span>LIVE</span></h3>
+                <div id="map"></div>
+            </div>
+
+            <div class="tracking-info">
+                <h3>📦 Active Shipments</h3>
+                <div id="shipmentsList">
+                    <div class="shipment-card active">
+                        <h4>TRK-2024-001</h4>
+                        <div class="shipment-details">
+                            <strong>Mumbai → Delhi</strong>
+                            <div>Priority: Express | Distance: 1,425 km</div>
+                            <div>ETA: 2-3 days</div>
+                            <div class="status-badge in-transit">In Transit</div>
+                        </div>
+                        <div class="weather-alert">
+                            ⚠️ Moderate rain expected on route
+                        </div>
+                    </div>
+                    
+                    <div class="shipment-card">
+                        <h4>TRK-2024-002</h4>
+                        <div class="shipment-details">
+                            <strong>Bangalore → Chennai</strong>
+                            <div>Priority: Standard | Distance: 346 km</div>
+                            <div>ETA: 1-2 days</div>
+                            <div class="status-badge pending">Pending</div>
+                        </div>
+                    </div>
+                    
+                    <div class="shipment-card">
+                        <h4>TRK-2024-003</h4>
+                        <div class="shipment-details">
+                            <strong>Kolkata → Mumbai</strong>
+                            <div>Priority: Urgent | Distance: 1,950 km</div>
+                            <div>ETA: 3-4 days</div>
+                            <div class="status-badge delayed">Delayed</div>
+                        </div>
+                        <div class="weather-alert">
+                            🚫 Heavy storms in Kolkata area
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <a href="/shipping" class="back-link">← Back to Shipping</a>
+    </div>
+
+    <script>
+    let map;
+    let markers = [];
+
+    // ✅ Initialize Google Map
+    function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+            center: { lat: 20.5937, lng: 78.9629 }, // India center
+            zoom: 5
+        });
+    }
+
+    // ✅ Handle form submit (MAIN LOGIC)
+    document.getElementById('trackingForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const trackingNumber = document.getElementById('trackingNumber').value;
+
+        try {
+            const res = await fetch(`/api/tracking/${trackingNumber}`);
+            const data = await res.json();
+
+            if (!data.success) {
+                alert(data.error || "Tracking failed");
+                return;
+            }
+
+            // ✅ Update UI + Map
+            updateShipmentInfo(data);
+            updateMap(data);
+
+        } catch (err) {
+            console.error(err);
+            alert("Server error");
+        }
+    });
+
+    // ✅ Update Shipment Card UI
+    function updateShipmentInfo(data) {
+        const container = document.getElementById('shipmentsList');
+
+        container.innerHTML = `
+            <div class="shipment-card active">
+                <h4>${data.tracking_number}</h4>
+                <div class="shipment-details">
+                    <strong>${data.origin} → ${data.destination}</strong>
+                    <div>Priority: ${data.priority}</div>
+                    <div>ETA: ${data.eta}</div>
+                    <div>Progress: ${data.progress}%</div>
+                    <div class="status-badge ${data.status}">
+                        ${data.status}
+                    </div>
+                </div>
+                ${data.weather_alerts?.length ? 
+                    `<div class="weather-alert">⚠️ ${data.weather_alerts.join(', ')}</div>` 
+                    : ''
+                }
+            </div>
+        `;
+    }
+
+    // ✅ Update Google Map with dynamic data
+    function updateMap(data) {
+        const origin = data.origin_coords;
+        const destination = data.destination_coords;
+        const current = data.current_coords;
+
+        // Clear old markers
+        markers.forEach(marker => marker.setMap(null));
+        markers = [];
+
+        // Origin marker
+        const originMarker = new google.maps.Marker({
+            position: origin,
+            map: map,
+            label: "O"
+        });
+
+        // Destination marker
+        const destMarker = new google.maps.Marker({
+            position: destination,
+            map: map,
+            label: "D"
+        });
+
+        // Current truck marker
+        const currentMarker = new google.maps.Marker({
+            position: current,
+            map: map,
+            label: "🚚"
+        });
+
+        markers.push(originMarker, destMarker, currentMarker);
+
+        // Draw route line
+        const routeLine = new google.maps.Polyline({
+            path: [origin, current, destination],
+            geodesic: true,
+            strokeColor: '#3282b8',
+            strokeOpacity: 1.0,
+            strokeWeight: 4,
+            map: map
+        });
+
+        // Auto zoom to fit route
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(origin);
+        bounds.extend(destination);
+        bounds.extend(current);
+        map.fitBounds(bounds);
+    }
+
+    // ✅ Auto-load tracking from URL (?tracking=TRK123)
+    document.addEventListener('DOMContentLoaded', function () {
+        const params = new URLSearchParams(window.location.search);
+        const trackingNumber = params.get('tracking');
+
+        if (trackingNumber) {
+            document.getElementById('trackingNumber').value = trackingNumber;
+
+            fetch(`/api/tracking/${trackingNumber}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        updateShipmentInfo(data);
+                        updateMap(data);
+                    }
+                });
+        }
+    });
+
+    // ✅ Load Google Maps
+    function loadGoogleMaps() {
+        const script = document.createElement('script');
+        script.src = "https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_KEY&callback=initMap";
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+    }
+
+    loadGoogleMaps();
+</script>
+</body>
+</html>

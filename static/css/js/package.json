@@ -1,0 +1,15 @@
+{
+  "name": "ai_shipping-system",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-session": "^1.19.0",
+    "mysql2": "^3.18.1"
+  }
+}

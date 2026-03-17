@@ -1,0 +1,158 @@
+<link rel="stylesheet" href="style.css">
+
+<div class="navbar">
+    <h2>AI Shipping Dashboard</h2>
+    <div class="nav-links">
+        <a href="/weather.html">🌤️ Weather Check</a>
+        <a href="/logout">Logout</a>
+    </div>
+</div>
+
+<div class="dashboard">
+    <div class="weather-status-card">
+        <h3>🌤️ Current Weather Status</h3>
+        <div id="currentWeatherStatus">
+            <p>Checking weather conditions...</p>
+        </div>
+        <button onclick="window.location.href='/weather.html'">Detailed Weather Analysis</button>
+    </div>
+
+    <div class="shipment-card">
+        <h3>📦 Create New Shipment</h3>
+        <form id="shipmentForm" action="/create-shipment" method="POST">
+            <input type="text" name="origin" id="origin" placeholder="Origin Location (City)" required>
+            <input type="text" name="destination" id="destination" placeholder="Destination Location (City)" required>
+            
+            <select name="payment_mode">
+                <option value="Online">Online Payment</option>
+                <option value="Offline">Offline Payment</option>
+            </select>
+
+            <button type="submit">Check Weather & Create Shipment</button>
+        </form>
+        
+        <div id="shipmentResult"></div>
+    </div>
+
+    <div class="info-card">
+        <h3>ℹ️ AI Weather-Based Shipping</h3>
+        <p>Our AI system analyzes real-time weather conditions to ensure safe and reliable shipping:</p>
+        <ul>
+            <li>✅ <strong>Good Weather:</strong> Proceed with shipping</li>
+            <li>⚠️ <strong>Moderate Conditions:</strong> Proceed with caution</li>
+            <li>🚫 <strong>Severe Weather:</strong> Delay or cancel shipment</li>
+        </ul>
+        <p><strong>Factors Checked:</strong> Temperature, wind speed, visibility, precipitation, and severe weather alerts</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Check weather for user's location on load
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                checkWeatherByCoordinates(position.coords.latitude, position.coords.longitude);
+            },
+            error => {
+                // Default to a major city if location denied
+                checkWeatherByCity('New York');
+            }
+        );
+    } else {
+        checkWeatherByCity('New York');
+    }
+
+    // Handle shipment form submission
+    document.getElementById('shipmentForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const origin = document.getElementById('origin').value;
+        const destination = document.getElementById('destination').value;
+        const resultDiv = document.getElementById('shipmentResult');
+        
+        resultDiv.innerHTML = '<p style="color: #666;">Checking weather conditions...</p>';
+        
+        try {
+            // Check weather for both origin and destination
+            const [originWeather, destWeather] = await Promise.all([
+                checkWeatherByCity(origin),
+                checkWeatherByCity(destination)
+            ]);
+            
+            // Determine if shipping is possible
+            const canShip = originWeather.shipping.suitable && destWeather.shipping.suitable;
+            
+            if (canShip) {
+                resultDiv.innerHTML = `
+                    <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 5px; margin-top: 10px;">
+                        <strong>✅ Weather Conditions Suitable!</strong><br>
+                        Both origin and destination have favorable weather for shipping.<br>
+                        <button onclick="this.parentElement.parentElement.submit()" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">Confirm Shipment</button>
+                    </div>
+                `;
+            } else {
+                const issues = [];
+                if (!originWeather.shipping.suitable) issues.push(`Origin: ${originWeather.shipping.reason}`);
+                if (!destWeather.shipping.suitable) issues.push(`Destination: ${destWeather.shipping.reason}`);
+                
+                resultDiv.innerHTML = `
+                    <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin-top: 10px;">
+                        <strong>🚫 Weather Conditions Not Suitable</strong><br>
+                        ${issues.join('<br>')}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `
+                <div style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 5px; margin-top: 10px;">
+                    <strong>⚠️ Unable to check weather conditions</strong><br>
+                    Please try again or proceed with caution.
+                </div>
+            `;
+        }
+    });
+});
+
+async function checkWeatherByCoordinates(lat, lon) {
+    try {
+        const response = await fetch(`/api/weather/coordinates?lat=${lat}&lon=${lon}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            updateWeatherStatus(data.weather, data.shipping);
+            return data;
+        }
+    } catch (error) {
+        console.error('Weather check failed:', error);
+    }
+}
+
+async function checkWeatherByCity(city) {
+    try {
+        const response = await fetch(`/api/weather/${city}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return data;
+        }
+    } catch (error) {
+        console.error('Weather check failed:', error);
+        return null;
+    }
+}
+
+function updateWeatherStatus(weather, shipping) {
+    const statusDiv = document.getElementById('currentWeatherStatus');
+    const statusIcon = shipping.suitable ? '✅' : '🚫';
+    const statusColor = shipping.suitable ? '#28a745' : '#dc3545';
+    
+    statusDiv.innerHTML = `
+        <div style="text-align: center; padding: 10px;">
+            <div style="font-size: 24px; margin-bottom: 5px;">${statusIcon}</div>
+            <div style="font-weight: bold; color: ${statusColor};">${shipping.recommendation}</div>
+            <div style="font-size: 14px; color: #666; margin-top: 5px;">${weather.name}: ${Math.round(weather.main.temp)}°C, ${weather.weather[0].description}</div>
+        </div>
+    `;
+}
+</script>
