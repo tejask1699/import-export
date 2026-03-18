@@ -2,6 +2,7 @@ from flask import Flask, request, render_template,redirect, url_for, session,sen
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
+from datetime import datetime
 import io
 import mysql.connector
 import requests
@@ -13,7 +14,7 @@ app.secret_key = 'your_secret_key_here'
 # OpenWeatherMap API
 WEATHER_API_KEY = 'bf98922579d3a372232f5f1736ece285'
 WEATHER_BASE_URL = 'https://api.openweathermap.org/data/2.5'
-
+GEOCODE_URL = "https://nominatim.openstreetmap.org/search"
 
 # MySQL connection with connection pooling
 def get_db_connection():
@@ -21,7 +22,7 @@ def get_db_connection():
         host="127.0.0.1",
         port=3306,
         user="root",
-        password="Tejas@1699",
+        password="root@1699",
         database="ai_shipping",
         # charset="utf8",
         # collation="utf8_general_ci"
@@ -31,6 +32,67 @@ def get_db_connection():
 def home():
     
     return render_template("login.html")
+# 📁 app.py
+
+
+@app.route("/reports")
+def reports_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    return render_template("reports.html")
+
+
+@app.route("/api/user-reports")
+def user_reports():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'})
+
+    db_conn = None
+    cursor = None
+
+    try:
+        db_conn = get_db_connection()
+        cursor = db_conn.cursor(dictionary=True)
+
+        cursor.execute(
+            "SELECT * FROM shipments WHERE user_id=%s ORDER BY created_at DESC",
+            (session['user_id'],)
+        )
+        shipments = cursor.fetchall()
+
+        # ✅ FIX: convert datetime → string
+        for s in shipments:
+            if isinstance(s.get('created_at'), datetime):
+                s['created_at'] = s['created_at'].strftime("%Y-%m-%d %H:%M:%S")
+            if isinstance(s.get('updated_at'), datetime):
+                s['updated_at'] = s['updated_at'].strftime("%Y-%m-%d %H:%M:%S")
+
+        # Stats
+        total = len(shipments)
+        in_transit = len([s for s in shipments if s['status'] == 'in-transit'])
+        delivered = len([s for s in shipments if s['status'] == 'delivered'])
+        delayed = len([s for s in shipments if s['status'] == 'delayed'])
+
+        return jsonify({
+            'success': True,
+            'data': shipments,
+            'stats': {
+                'total': total,
+                'in_transit': in_transit,
+                'delivered': delivered,
+                'delayed': delayed
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+    finally:
+        if cursor:
+            cursor.close()
+        if db_conn:
+            db_conn.close()
 
 
 @app.route("/register", methods=["POST"])
@@ -367,6 +429,7 @@ def login():
 
 @app.route("/logout")
 def logout():
+    
     session.clear()
     return redirect(url_for('login'))
 
@@ -388,29 +451,109 @@ def tracking():
     return render_template("tracking.html")
 
 
+def get_coordinates(city: str) -> dict:
+    """Convert city → lat/lng using OSM"""
+    try:
+        response = requests.get(
+            GEOCODE_URL,
+            params={
+                "q": city,
+                "format": "json",
+                "limit": 1
+            },
+            headers={"User-Agent": "ai-shipping-app"}
+        )
+
+        data = response.json()
+
+        if not data:
+            raise ValueError(f"No location found for {city}")
+
+        return {
+            "lat": float(data[0]["lat"]),
+            "lng": float(data[0]["lon"])
+        }
+
+    except Exception as e:
+        raise Exception(f"Geocoding failed: {str(e)}")
+
+
+
+def safe_coords(city):
+    try:
+        return get_coordinates(city)
+    except:
+        return {"lat": 20.5937, "lng": 78.9629}
+
+
+def get_current_location(origin, destination, progress):
+    return {
+        "lat": origin["lat"] + (destination["lat"] - origin["lat"]) * (progress / 100),
+        "lng": origin["lng"] + (destination["lng"] - origin["lng"]) * (progress / 100)
+    }
+
+
 @app.route("/api/tracking/<tracking_number>")
 def get_tracking_data(tracking_number):
     if 'user_id' not in session:
         return json.dumps({'success': False, 'error': 'Unauthorized'})
-    
+
+    db_conn = None
+    cursor = None
+
     try:
-        # Here you would fetch tracking data from database
-        # For demo, return sample tracking data
-        tracking_data = {
+        db_conn = get_db_connection()
+        cursor = db_conn.cursor(dictionary=True)
+
+        cursor.execute(
+            "SELECT origin, destination, status FROM shipments WHERE tracking_number=%s",
+            (tracking_number,)
+        )
+        shipment = cursor.fetchone()
+
+        if not shipment:
+            return json.dumps({'success': False, 'error': 'Tracking not found'})
+
+        origin = shipment['origin']
+        destination = shipment['destination']
+        status = shipment['status']
+
+        origin_coords = safe_coords(origin)
+        destination_coords = safe_coords(destination)
+
+        progress = 65
+
+        current_coords = get_current_location(
+            origin_coords,
+            destination_coords,
+            progress
+        )
+
+        return json.dumps({
             'success': True,
             'tracking_number': tracking_number,
-            'status': 'in-transit',
-            'origin': 'Mumbai',
-            'destination': 'Delhi',
-            'current_position': {'lat': 21.0, 'lng': 75.0},
-            'progress': 65,
-            'eta': '2024-03-16',
-            'weather_alerts': ['Moderate rain expected on route']
-        }
-        return json.dumps(tracking_data)
-    except Exception as e:
-        return json.dumps({'success': False, 'error': str(e)})
+            'status': status,
+            'origin': origin,
+            'destination': destination,
+            'origin_coords': origin_coords,
+            'destination_coords': destination_coords,
+            'current_coords': current_coords,
+            'progress': progress,
+            'eta': '2 days',
+            'weather_alerts': []
+        })
 
+    except Exception as e:
+        return json.dumps({
+            'success': False,
+            'error': str(e)
+        })
+
+    finally:
+        if cursor:
+            cursor.close()
+        if db_conn:
+            db_conn.close()
 
 # Reports API - Fetch all shipments
 @app.route("/api/reports/pdf")

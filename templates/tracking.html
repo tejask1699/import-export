@@ -1,5 +1,10 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -173,7 +178,8 @@
             font-size: 14px;
         }
 
-        .form-group input, .form-group select {
+        .form-group input,
+        .form-group select {
             padding: 10px;
             border: 2px solid #ddd;
             border-radius: 8px;
@@ -181,7 +187,8 @@
             transition: border-color 0.3s ease;
         }
 
-        .form-group input:focus, .form-group select:focus {
+        .form-group input:focus,
+        .form-group select:focus {
             outline: none;
             border-color: #3282b8;
         }
@@ -228,9 +235,17 @@
         }
 
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.3; }
-            100% { opacity: 1; }
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
 
         .weather-alert {
@@ -263,17 +278,19 @@
             .tracking-container {
                 grid-template-columns: 1fr;
             }
-            
+
             .control-form {
                 grid-template-columns: 1fr;
             }
-            
+
             #map {
                 height: 400px;
             }
         }
     </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -323,7 +340,7 @@
                             ⚠️ Moderate rain expected on route
                         </div>
                     </div>
-                    
+
                     <div class="shipment-card">
                         <h4>TRK-2024-002</h4>
                         <div class="shipment-details">
@@ -333,7 +350,7 @@
                             <div class="status-badge pending">Pending</div>
                         </div>
                     </div>
-                    
+
                     <div class="shipment-card">
                         <h4>TRK-2024-003</h4>
                         <div class="shipment-details">
@@ -350,51 +367,52 @@
             </div>
         </div>
 
-        <a href="/shipping" class="back-link">← Back to Shipping</a>
+        <!-- <a href="javascript:history.back()" class="back-link">← Back</a> -->
     </div>
-
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-    let map;
-    let markers = [];
+        let map;
+        let markers = [];
+        let routeLine;
 
-    // ✅ Initialize Google Map
-    function initMap() {
-        map = new google.maps.Map(document.getElementById('map'), {
-            center: { lat: 20.5937, lng: 78.9629 }, // India center
-            zoom: 5
-        });
-    }
+        // ✅ Initialize Google Map
+        function initMap() {
+            map = L.map('map').setView([20.5937, 78.9629], 5);
 
-    // ✅ Handle form submit (MAIN LOGIC)
-    document.getElementById('trackingForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const trackingNumber = document.getElementById('trackingNumber').value;
-
-        try {
-            const res = await fetch(`/api/tracking/${trackingNumber}`);
-            const data = await res.json();
-
-            if (!data.success) {
-                alert(data.error || "Tracking failed");
-                return;
-            }
-
-            // ✅ Update UI + Map
-            updateShipmentInfo(data);
-            updateMap(data);
-
-        } catch (err) {
-            console.error(err);
-            alert("Server error");
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
         }
-    });
 
-    // ✅ Update Shipment Card UI
-    function updateShipmentInfo(data) {
-        const container = document.getElementById('shipmentsList');
+        // ✅ Handle form submit (MAIN LOGIC)
+        document.getElementById('trackingForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
 
-        container.innerHTML = `
+            const trackingNumber = document.getElementById('trackingNumber').value;
+
+            try {
+                const res = await fetch(`/api/tracking/${trackingNumber}`);
+                const data = await res.json();
+
+                if (!data.success) {
+                    alert(data.error || "Tracking failed");
+                    return;
+                }
+                // ✅ Update UI + Map
+                updateShipmentInfo(data);
+                updateMap(data);
+
+            } catch (err) {
+                console.error(err);
+                alert("Server error");
+            }
+        });
+
+        // ✅ Update Shipment Card UI
+        function updateShipmentInfo(data) {
+            const container = document.getElementById('shipmentsList');
+
+            container.innerHTML = `
             <div class="shipment-card active">
                 <h4>${data.tracking_number}</h4>
                 <div class="shipment-details">
@@ -406,94 +424,132 @@
                         ${data.status}
                     </div>
                 </div>
-                ${data.weather_alerts?.length ? 
-                    `<div class="weather-alert">⚠️ ${data.weather_alerts.join(', ')}</div>` 
+                ${data.weather_alerts?.length ?
+                    `<div class="weather-alert">⚠️ ${data.weather_alerts.join(', ')}</div>`
                     : ''
                 }
             </div>
         `;
-    }
+        }
+    </script>
+    <script>
+        async function updateMap(data) {
+            const origin = data.origin_coords;
+            const destination = data.destination_coords;
+            const current = data.current_coords;
 
-    // ✅ Update Google Map with dynamic data
-    function updateMap(data) {
-        const origin = data.origin_coords;
-        const destination = data.destination_coords;
-        const current = data.current_coords;
+            // Clear old
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
 
-        // Clear old markers
-        markers.forEach(marker => marker.setMap(null));
-        markers = [];
+            if (routeLine) map.removeLayer(routeLine);
 
-        // Origin marker
-        const originMarker = new google.maps.Marker({
-            position: origin,
-            map: map,
-            label: "O"
-        });
+            // Markers
+            const originMarker = L.marker([origin.lat, origin.lng]).addTo(map);
+            const destMarker = L.marker([destination.lat, destination.lng]).addTo(map);
+            const currentMarker = L.marker([current.lat, current.lng]).addTo(map);
 
-        // Destination marker
-        const destMarker = new google.maps.Marker({
-            position: destination,
-            map: map,
-            label: "D"
-        });
+            markers.push(originMarker, destMarker, currentMarker);
 
-        // Current truck marker
-        const currentMarker = new google.maps.Marker({
-            position: current,
-            map: map,
-            label: "🚚"
-        });
+            try {
+                // ✅ OSRM API (road route)
+                const res = await fetch(
+                    `https://router.project-osrm.org/route/v1/driving/` +
+                    `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+                    `?overview=full&geometries=geojson`
+                );
 
-        markers.push(originMarker, destMarker, currentMarker);
+                const routeData = await res.json();
 
-        // Draw route line
-        const routeLine = new google.maps.Polyline({
-            path: [origin, current, destination],
-            geodesic: true,
-            strokeColor: '#3282b8',
-            strokeOpacity: 1.0,
-            strokeWeight: 4,
-            map: map
-        });
+                const coords = routeData.routes[0].geometry.coordinates;
 
-        // Auto zoom to fit route
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend(origin);
-        bounds.extend(destination);
-        bounds.extend(current);
-        map.fitBounds(bounds);
-    }
+                // Convert [lng, lat] → [lat, lng]
+                const latLngs = coords.map(c => [c[1], c[0]]);
 
-    // ✅ Auto-load tracking from URL (?tracking=TRK123)
-    document.addEventListener('DOMContentLoaded', function () {
-        const params = new URLSearchParams(window.location.search);
-        const trackingNumber = params.get('tracking');
+                // Draw REAL road route
+                routeLine = L.polyline(latLngs, {
+                    color: '#3282b8',
+                    weight: 5
+                }).addTo(map);
 
-        if (trackingNumber) {
+                map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
+
+            } catch (err) {
+                console.error("Routing failed", err);
+
+                // fallback to straight line
+                routeLine = L.polyline([
+                    [origin.lat, origin.lng],
+                    [destination.lat, destination.lng]
+                ]).addTo(map);
+            }
+        }
+    </script>
+    <script>
+        function getQueryParam(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        async function autoLoadTracking() {
+            const trackingNumber = getQueryParam('tracking');
+
+            if (!trackingNumber) return;
+
+            // Fill input
             document.getElementById('trackingNumber').value = trackingNumber;
 
-            fetch(`/api/tracking/${trackingNumber}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        updateShipmentInfo(data);
-                        updateMap(data);
-                    }
-                });
+            try {
+                const res = await fetch(`/api/tracking/${trackingNumber}`);
+                const data = await res.json();
+
+                if (!data.success) {
+                    console.warn("Auto tracking failed");
+                    return;
+                }
+
+                updateShipmentInfo(data);
+                updateMap(data);
+
+            } catch (err) {
+                console.error("Auto tracking error", err);
+            }
         }
-    });
+        async function loadShipments() {
+            try {
+                const res = await fetch('/api/shipments');
+                const data = await res.json();
 
-    // ✅ Load Google Maps
-    function loadGoogleMaps() {
-        const script = document.createElement('script');
-        script.src = "https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_KEY&callback=initMap";
-        script.async = true;
-        script.defer = true;
-        document.head.appendChild(script);
-    }
+                const container = document.getElementById('shipmentsList');
 
-    loadGoogleMaps();
-</script>
+                container.innerHTML = data.data.map(s => `
+            <div class="shipment-card ${s.status === 'in-transit' ? 'active' : ''}">
+                <h4>${s.tracking_number}</h4>
+                <div class="shipment-details">
+                    <strong>${s.origin} → ${s.destination}</strong>
+                    <div>Priority: ${s.priority}</div>
+                    <div>Status: ${s.status}</div>
+                    <div class="status-badge ${s.status}">
+                        ${s.status}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+            } catch (err) {
+                console.error("Failed to load shipments", err);
+            }
+        }
+
+        // Load on page start
+        document.addEventListener('DOMContentLoaded', function () {
+            initMap();
+            loadShipments();
+            autoLoadTracking(); // 🔥 KEY LINE
+        });
+    </script>
 </body>
+
 </html>
+
+{% endblock %}

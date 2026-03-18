@@ -7,7 +7,7 @@ try:
         host="127.0.0.1",
         port=3306,
         user="root",
-        password="Tejas@1699",
+        password="root@1699",
         # charset="utf8",
         # collation="utf8_general_ci"
     )

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ title }}</title>
+    <style>
+        body { margin: 0; font-family: Arial; display: flex; }
+
+        .sidebar {
+            width: 220px;
+            background: #0f4c75;
+            color: white;
+            height: 100vh;
+            padding: 20px;
+            position: fixed;
+        }
+
+        .sidebar a {
+            display: block;
+            color: white;
+            text-decoration: none;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .sidebar a:hover {
+            background: #3282b8;
+        }
+
+        .main {
+            margin-left: 240px;
+            padding: 20px;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="sidebar">
+    <h2>🚚 Shipping</h2>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/shipping">Create Shipment</a>
+    <a href="/tracking">Track Shipment</a>
+    <a href="/weather">Weather Tracker</a>
+    <a href="/reports">Reports</a>
+
+    <a href="/logout">Logout</a>
+</div>
+
+<div class="main">
+    {% block content %}{% endblock %}
+</div>
+
+</body>
+</html>
