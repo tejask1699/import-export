@@ -1,318 +1,210 @@
-{% extends "layout.html" %} {% block content %}
+{% extends "layout.html" %}
+{% block content %}
 
-<h1>📊 My Shipment Reports</h1>
+<h2 style="margin-bottom: 20px;">📊 Shipment Reports</h2>
 
-<!-- 🔍 Search + Filter -->
-<div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap">
-  <input
-    type="text"
-    id="searchInput"
-    placeholder="Search tracking / city..."
-    style="padding: 10px; width: 250px"
-  />
+<!-- SEARCH + FILTER -->
+<div class="card" style="margin-bottom:20px;">
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
 
-  <button id="reportBtn">📄 Reports</button>
-  <select id="filter" onchange="filterTable()">
-    <option value="">All</option>
-    <option value="in-transit">In Transit</option>
-    <option value="delivered">Delivered</option>
-    <option value="delayed">Delayed</option>
-  </select>
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="Search tracking / city..."
+      style="width:250px;"
+    />
+
+    <select id="filter" onchange="filterTable()">
+      <option value="">All</option>
+      <option value="in-transit">In Transit</option>
+      <option value="delivered">Delivered</option>
+      <option value="delayed">Delayed</option>
+    </select>
+
+    <button id="reportBtn" class="btn">📄 Export</button>
+
+  </div>
 </div>
 
-<!-- Stats -->
-<div class="cards">
+<!-- STATS -->
+<div style="
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:20px;
+  margin-bottom:20px;
+">
+
   <div class="card">
-    <h3>Total</h3>
+    <h4>Total</h4>
     <p id="total">0</p>
   </div>
+
   <div class="card">
-    <h3>In Transit</h3>
+    <h4>In Transit</h4>
     <p id="inTransit">0</p>
   </div>
+
   <div class="card">
-    <h3>Delivered</h3>
+    <h4>Delivered</h4>
     <p id="delivered">0</p>
   </div>
+
   <div class="card">
-    <h3>Delayed</h3>
+    <h4>Delayed</h4>
     <p id="delayed">0</p>
   </div>
+
 </div>
 
-<!-- Table -->
-<table id="reportTable">
-  <thead>
-    <tr>
-      <th>Tracking</th>
-      <th>Route</th>
-      <th>Status</th>
-      <th>Date</th>
-      {% if role == 'admin' %}
-      <th>User</th>
-      {% endif %}
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+<!-- TABLE -->
+<div class="card">
+  <table id="reportTable">
+    <thead>
+      <tr>
+        <th>Tracking</th>
+        <th>Route</th>
+        <th>Status</th>
+        <th>Date</th>
+        {% if role == 'admin' %}
+        <th>User</th>
+        {% endif %}
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-<!-- Pagination -->
-<div id="pagination" style="margin-top: 15px"></div>
+  <!-- PAGINATION -->
+  <div id="pagination" style="margin-top:15px;"></div>
+</div>
 
-{% block styles %}
 <style>
-  body {
-    background: #f5f7fb;
-  }
+input, select {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
 
-  h1 {
-    margin-bottom: 20px;
-    color: #0f4c75;
-  }
+/* STATUS */
+.status {
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
 
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 20px;
-    margin-bottom: 25px;
-  }
+.in-transit { background:#fff3cd; color:#856404; }
+.delivered { background:#d4edda; color:#155724; }
+.delayed { background:#f8d7da; color:#721c24; }
 
-  .card {
-    background: linear-gradient(135deg, #ffffff, #f1f6fb);
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
-    transition: transform 0.2s ease;
-  }
+/* PAGINATION */
+#pagination button {
+  margin: 5px;
+  padding: 6px 12px;
+  border: none;
+  background: #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+}
 
-  .card:hover {
-    transform: translateY(-5px);
-  }
-
-  .card h3 {
-    margin: 0;
-    font-size: 14px;
-    color: #666;
-  }
-
-  .card p {
-    font-size: 26px;
-    font-weight: bold;
-    margin-top: 10px;
-    color: #0f4c75;
-  }
-
-  /* Filter */
-  #filter {
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    font-size: 14px;
-    cursor: pointer;
-  }
-
-  /* Table */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
-  }
-
-  thead {
-    background: #0f4c75;
-    color: white;
-  }
-
-  th {
-    text-align: left;
-    padding: 12px;
-    font-size: 14px;
-  }
-
-  td {
-    padding: 12px;
-    border-bottom: 1px solid #eee;
-    font-size: 14px;
-  }
-
-  tr:hover {
-    background: #f1f6fb;
-    cursor: pointer;
-  }
-
-  /* Status badges */
-  .status {
-    padding: 5px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: bold;
-  }
-
-  .in-transit {
-    background: #fff3cd;
-    color: #856404;
-  }
-
-  .delivered {
-    background: #d4edda;
-    color: #155724;
-  }
-
-  .delayed {
-    background: #f8d7da;
-    color: #721c24;
-  }
-
-  /* Pagination */
-  #pagination button {
-    margin: 5px;
-    padding: 6px 12px;
-    border: none;
-    border-radius: 5px;
-    background: #eee;
-    cursor: pointer;
-  }
-
-  #pagination button.active {
-    background: #0f4c75;
-    color: white;
-  }
-
-  td[colspan="4"] {
-    text-align: center;
-    padding: 20px;
-    color: #777;
-  }
-
-  button {
-    background: #0f4c75;
-    color: white;
-    padding: 6px 10px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-  }
-
-  button:hover {
-    background: #3282b8;
-  }
+#pagination button.active {
+  background: var(--secondary);
+  color: white;
+}
 </style>
-{% endblock %}
 
 <script>
-  const role = "{{ role }}";
-  let currentPage = 1;
-  let currentSearch = "";
-  let currentStatus = "";
+const role = "{{ role }}";
+let currentPage = 1;
+let currentSearch = "";
+let currentStatus = "";
 
-  const reportBtn = document.getElementById("reportBtn");
+document.getElementById("reportBtn")
+.addEventListener("click", () => {
+  window.open("/api/reports/pdf", "_blank");
+});
 
-  reportBtn.addEventListener("click", () => {
-    window.open("/api/reports/pdf", "_blank");
-  });
-  // 🚀 Load Reports
-  async function loadReports(page = 1) {
-    try {
-      const res = await fetch(
-        `/api/user-reports?page=${page}&limit=5&search=${currentSearch}&status=${currentStatus}`,
-      );
+/* LOAD */
+async function loadReports(page = 1) {
+  const res = await fetch(
+    `/api/user-reports?page=${page}&limit=5&search=${currentSearch}&status=${currentStatus}`
+  );
 
-      const data = await res.json();
-      if (!data.success) return;
+  const data = await res.json();
+  if (!data.success) return;
 
-      // Stats
-      document.getElementById("total").innerText = data.stats.total;
-      document.getElementById("inTransit").innerText = data.stats.in_transit;
-      document.getElementById("delivered").innerText = data.stats.delivered;
-      document.getElementById("delayed").innerText = data.stats.delayed;
+  document.getElementById("total").innerText = data.stats.total;
+  document.getElementById("inTransit").innerText = data.stats.in_transit;
+  document.getElementById("delivered").innerText = data.stats.delivered;
+  document.getElementById("delayed").innerText = data.stats.delayed;
 
-      renderTable(data.data);
-      renderPagination(data.pagination);
-    } catch (err) {
-      console.error("Error:", err);
-    }
-  }
+  renderTable(data.data);
+  renderPagination(data.pagination);
+}
 
-  // 📦 Render Table
-  function renderTable(shipments) {
+/* TABLE */
+function renderTable(list) {
   const tbody = document.querySelector("#reportTable tbody");
 
-  if (!shipments.length) {
+  if (!list.length) {
     const colSpan = role === "admin" ? 6 : 5;
-    tbody.innerHTML = `<tr><td colspan="${colSpan}">No shipments found</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colSpan}">No data</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = shipments.map(s => {
-    return `
-      <tr>
-        <td>${s.tracking_number}</td>
-        <td>${s.origin} → ${s.destination}</td>
-        <td><span class="status ${s.status}">${s.status}</span></td>
-        <td>${s.created_at ? new Date(s.created_at).toLocaleString() : "-"}</td>
-
-        ${role === "admin" ? `<td>${s.user_name || "-"}</td>` : ""}
-
-        <td>
-          <button onclick="goTrack('${s.tracking_number}')">
-            Track
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join("");
+  tbody.innerHTML = list.map(s => `
+    <tr>
+      <td>${s.tracking_number}</td>
+      <td>${s.origin} → ${s.destination}</td>
+      <td><span class="status ${s.status}">${s.status}</span></td>
+      <td>${s.created_at ? new Date(s.created_at).toLocaleString() : "-"}</td>
+      ${role==="admin" ? `<td>${s.user_name || "-"}</td>` : ""}
+      <td>
+        <button class="btn" onclick="goTrack('${s.tracking_number}')">
+          Track
+        </button>
+      </td>
+    </tr>
+  `).join("");
 }
 
-  // 📄 Pagination
-  function renderPagination(pagination) {
-    const container = document.getElementById("pagination");
+/* PAGINATION */
+function renderPagination(p) {
+  const container = document.getElementById("pagination");
 
-    let buttons = "";
+  container.innerHTML = Array.from({length:p.pages}, (_,i)=>`
+    <button class="${i+1===p.page?'active':''}" onclick="changePage(${i+1})">
+      ${i+1}
+    </button>
+  `).join("");
+}
 
-    for (let i = 1; i <= pagination.pages; i++) {
-      buttons += `
-            <button class="${i === pagination.page ? "active" : ""}"
-                onclick="changePage(${i})">
-                ${i}
-            </button>
-        `;
-    }
+function changePage(p){
+  currentPage = p;
+  loadReports(p);
+}
 
-    container.innerHTML = buttons;
-  }
+/* SEARCH */
+document.getElementById("searchInput")
+.addEventListener("input", e=>{
+  currentSearch = e.target.value;
+  loadReports(1);
+});
 
-  function changePage(page) {
-    currentPage = page;
-    loadReports(currentPage);
-  }
+/* FILTER */
+function filterTable(){
+  currentStatus = document.getElementById("filter").value;
+  loadReports(1);
+}
 
-  // 🔍 Search
-  document.getElementById("searchInput").addEventListener("input", (e) => {
-    currentSearch = e.target.value;
-    currentPage = 1;
-    loadReports(currentPage);
-  });
+/* NAV */
+function goTrack(id){
+  window.location.href = `/tracking?tracking=${id}`;
+}
 
-  // 🎯 Filter
-  function filterTable() {
-    currentStatus = document.getElementById("filter").value;
-    currentPage = 1;
-    loadReports(currentPage);
-  }
-
-  // 🔗 Redirect
-  function goTrack(id) {
-    window.location.href = `/tracking?tracking=${id}`;
-  }
-
-  // Init
-  document.addEventListener("DOMContentLoaded", () => {
-    loadReports();
-  });
+/* INIT */
+document.addEventListener("DOMContentLoaded", ()=>{
+  loadReports();
+});
 </script>
 
 {% endblock %}

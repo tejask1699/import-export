@@ -1,221 +1,176 @@
-{% extends "layout.html" %} {% block content %}
+{% extends "layout.html" %}
+{% block content %}
 
-<h1>📊 Dashboard</h1>
+<h2 style="margin-bottom:20px;">📊 Dashboard</h2>
 
-<!-- Search -->
-<input
-  type="text"
-  id="searchInput"
-  placeholder="Search by tracking / city..."
-  style="padding: 10px; margin-bottom: 15px; width: 300px"
-/>
-
-<!-- Stats Cards -->
-<div class="cards">
-  <div class="card">
-    <h3>Total</h3>
-    <p id="total">0</p>
-  </div>
-  <div class="card">
-    <h3>In Transit</h3>
-    <p id="inTransit">0</p>
-  </div>
-  <div class="card">
-    <h3>Delivered</h3>
-    <p id="delivered">0</p>
-  </div>
-  <div class="card">
-    <h3>Delayed</h3>
-    <p id="delayed">0</p>
-  </div>
+<!-- SEARCH -->
+<div class="card" style="margin-bottom:20px;">
+  <input
+    type="text"
+    id="searchInput"
+    placeholder="Search tracking / city..."
+    style="width:300px;"
+  />
 </div>
 
-<!-- Table -->
-<h2>📦 Shipments</h2>
+<!-- STATS -->
+<div style="
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:20px;
+  margin-bottom:20px;
+">
 
-<table id="shipmentTable">
-  <thead>
-    <tr>
-      <th>Tracking</th>
-      <th>Route</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  <div class="card">
+    <h4>Total</h4>
+    <p id="total">0</p>
+  </div>
 
-<!-- Pagination -->
-<div id="pagination" style="margin-top: 15px"></div>
+  <div class="card">
+    <h4>In Transit</h4>
+    <p id="inTransit">0</p>
+  </div>
+
+  <div class="card">
+    <h4>Delivered</h4>
+    <p id="delivered">0</p>
+  </div>
+
+  <div class="card">
+    <h4>Delayed</h4>
+    <p id="delayed">0</p>
+  </div>
+
+</div>
+
+<!-- TABLE -->
+<div class="card">
+  <h3 style="margin-bottom:10px;">📦 Shipments</h3>
+
+  <table id="shipmentTable">
+    <thead>
+      <tr>
+        <th>Tracking</th>
+        <th>Route</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- PAGINATION -->
+  <div id="pagination" style="margin-top:15px;"></div>
+</div>
 
 <style>
-  .cards {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
-  }
+input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
 
-  .card {
-    flex: 1;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-  }
+/* STATUS */
+.status {
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
 
-  .card h3 {
-    margin: 0;
-    color: #0f4c75;
-  }
+.in-transit { background:#fff3cd; color:#856404; }
+.delivered { background:#d4edda; color:#155724; }
+.pending { background:#94a3b8; color:white; }
+.delayed { background:#f8d7da; color:#721c24; }
 
-  .card p {
-    font-size: 26px;
-    font-weight: bold;
-    margin-top: 10px;
-  }
+/* PAGINATION */
+#pagination button {
+  margin: 5px;
+  padding: 6px 12px;
+  border: none;
+  background: #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+}
 
-  table {
-    width: 100%;
-    background: white;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-  }
-
-  th,
-  td {
-    padding: 12px;
-    border-bottom: 1px solid #ddd;
-  }
-
-  tr:hover {
-    background: #f1f1f1;
-    cursor: pointer;
-  }
-
-  .status {
-    padding: 4px 8px;
-    border-radius: 5px;
-    color: white;
-    font-size: 12px;
-  }
-
-  .in-transit {
-    background: #ffc107;
-    color: black;
-  }
-  .delivered {
-    background: #28a745;
-  }
-  .pending {
-    background: #6c757d;
-  }
-  .delayed {
-    background: #dc3545;
-  }
-
-  button {
-    border: none;
-    padding: 6px 12px;
-    border-radius: 5px;
-    background: #eee;
-    cursor: pointer;
-  }
-
-  button.active {
-    background: #0f4c75;
-    color: white;
-  }
+#pagination button.active {
+  background: var(--secondary);
+  color: white;
+}
 </style>
 
 <script>
-  let currentPage = 1;
-  let currentSearch = "";
+let currentPage = 1;
+let currentSearch = "";
 
-  async function loadDashboard(page = 1, search = "") {
-    try {
-      const res = await fetch(
-        `/api/user-reports?page=${page}&limit=5&search=${search}`,
-      );
-      const data = await res.json();
+async function loadDashboard(page = 1, search = "") {
+  try {
+    const res = await fetch(
+      `/api/user-reports?page=${page}&limit=5&search=${search}`
+    );
+    const data = await res.json();
 
-      const shipments = data.data;
+    const shipments = data.data;
 
-      // ✅ Stats
-      if (data.stats) {
-        document.getElementById("total").innerText = data.stats.total;
-        document.getElementById("inTransit").innerText = data.stats.in_transit;
-        document.getElementById("delivered").innerText = data.stats.delivered;
-        document.getElementById("delayed").innerText = data.stats.delayed;
-      }
-
-      // ✅ Table
-      const tbody = document.querySelector("#shipmentTable tbody");
-
-      if (shipments.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3">No shipments found</td></tr>`;
-      } else {
-        tbody.innerHTML = shipments
-          .map(
-            (s) => `
-                <tr onclick="goTrack('${s.tracking_number}')">
-                    <td>${s.tracking_number}</td>
-                    <td>${s.origin} → ${s.destination}</td>
-                    <td>
-                        <span class="status ${s.status}">
-                            ${s.status}
-                        </span>
-                    </td>
-                </tr>
-            `,
-          )
-          .join("");
-      }
-
-      // ✅ Pagination
-      renderPagination(data.pagination);
-    } catch (err) {
-      console.error("Dashboard load failed", err);
-    }
-  }
-
-  function renderPagination(pagination) {
-    const container = document.getElementById("pagination");
-
-    let buttons = "";
-
-    for (let i = 1; i <= pagination.pages; i++) {
-      buttons += `
-            <button class="${i === pagination.page ? "active" : ""}"
-                onclick="changePage(${i})">
-                ${i}
-            </button>
-        `;
+    // STATS
+    if (data.stats) {
+      total.innerText = data.stats.total;
+      inTransit.innerText = data.stats.in_transit;
+      delivered.innerText = data.stats.delivered;
+      delayed.innerText = data.stats.delayed;
     }
 
-    container.innerHTML = buttons;
+    // TABLE
+    const tbody = document.querySelector("#shipmentTable tbody");
+
+    if (!shipments.length) {
+      tbody.innerHTML = `<tr><td colspan="3">No shipments found</td></tr>`;
+    } else {
+      tbody.innerHTML = shipments.map(s => `
+        <tr onclick="goTrack('${s.tracking_number}')">
+          <td>${s.tracking_number}</td>
+          <td>${s.origin} → ${s.destination}</td>
+          <td><span class="status ${s.status}">${s.status}</span></td>
+        </tr>
+      `).join("");
+    }
+
+    renderPagination(data.pagination);
+
+  } catch (err) {
+    console.error("Dashboard load failed", err);
   }
+}
 
-  function changePage(page) {
-    currentPage = page;
-    loadDashboard(currentPage, currentSearch);
-  }
+function renderPagination(p) {
+  const container = document.getElementById("pagination");
 
-  // 🔍 Search
-  document.getElementById("searchInput").addEventListener("input", (e) => {
-    currentSearch = e.target.value;
-    currentPage = 1;
-    loadDashboard(currentPage, currentSearch);
-  });
+  container.innerHTML = Array.from({length:p.pages}, (_,i)=>`
+    <button class="${i+1===p.page?'active':''}" onclick="changePage(${i+1})">
+      ${i+1}
+    </button>
+  `).join("");
+}
 
-  // Redirect
-  function goTrack(trackingNumber) {
-    window.location.href = `/tracking?tracking=${trackingNumber}`;
-  }
+function changePage(p){
+  currentPage = p;
+  loadDashboard(p, currentSearch);
+}
 
-  // Init
-  document.addEventListener("DOMContentLoaded", () => {
-    loadDashboard();
-  });
+// SEARCH
+document.getElementById("searchInput")
+.addEventListener("input", e=>{
+  currentSearch = e.target.value;
+  loadDashboard(1, currentSearch);
+});
+
+// NAV
+function goTrack(id){
+  window.location.href = `/tracking?tracking=${id}`;
+}
+
+// INIT
+document.addEventListener("DOMContentLoaded", ()=>{
+  loadDashboard();
+});
 </script>
 
 {% endblock %}

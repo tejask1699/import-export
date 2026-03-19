@@ -227,14 +227,14 @@ def admin_dashboard():
     if session.get('user_role') != 'admin':
         return "Unauthorized", 403
 
-    return render_template('adminDashboard.html')
+    return render_template('adminDashboard.html', role=session.get("user_role"))
 
 
 # Shipping Page - Main import/export functionality
 @app.route('/shipping')
 def shipping():
     
-    return render_template("shipping.html")
+    return render_template("shipping.html", role=session.get("user_role"))
 
 
 @app.route('/api/shipments')
@@ -260,49 +260,66 @@ def get_shipments():
 @app.route('/create-shipment', methods=['POST'])
 def create_shipment():
     if 'user_id' not in session:
-        return redirect(url_for('login'))
-    
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
     db_conn = None
     cursor = None
+
     try:
         origin = request.form.get('origin')
         destination = request.form.get('destination')
         payment_mode = request.form.get('payment')
         priority = request.form.get('priority')
-        
-        # Generate tracking number
-        import random
-        import datetime
-        tracking_number = f"TRK-{datetime.datetime.now().year}-{random.randint(1000, 9999)}"
-        
+
+        # ✅ Validation
+        if not origin or not destination:
+            return jsonify({
+                'success': False,
+                'error': 'Origin and Destination are required'
+            }), 400
+
+        # ✅ Better Tracking Number (more unique)
+        tracking_number = f"TRK-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(100,999)}"
+
         db_conn = get_db_connection()
         cursor = db_conn.cursor()
-        query = "INSERT INTO shipments (user_id, origin, destination, payment_mode, priority, status, tracking_number) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-        values = (session['user_id'], origin, destination, payment_mode, priority, 'in-transit', tracking_number)
+
+        query = """
+            INSERT INTO shipments 
+            (user_id, origin, destination, payment_mode, priority, status, tracking_number)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+
+        values = (
+            session['user_id'],
+            origin,
+            destination,
+            payment_mode,
+            priority,
+            'in-transit',
+            tracking_number
+        )
+
         cursor.execute(query, values)
         db_conn.commit()
-        
-        return json.dumps({
-            'success': True, 
+
+        return jsonify({
+            'success': True,
             'tracking_number': tracking_number,
             'message': 'Shipment created successfully!'
         })
+
     except Exception as e:
-        return json.dumps({
+        return jsonify({
             'success': False,
             'error': str(e)
-        })
+        }), 500
+
     finally:
         if cursor:
-            try:
-                cursor.close()
-            except:
-                pass
+            cursor.close()
         if db_conn:
-            try:
-                db_conn.close()
-            except:
-                pass
+            db_conn.close()
 
 
 # Weather Page with API integration
@@ -310,7 +327,7 @@ def create_shipment():
 def weather():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template("weather.html")
+    return render_template("weather.html", role=session.get("user_role"))
 
 
 # Weather API endpoints
@@ -481,7 +498,7 @@ def dashboard():
     if session.get('user_role') == 'admin':
         return redirect(url_for('admin_dashboard'))
 
-    return render_template("dashboard.html")
+    return render_template("dashboard.html", role=session.get("user_role"))
 
 
 @app.route("/login")
@@ -512,7 +529,7 @@ def demo_map():
 def tracking():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template("tracking.html")
+    return render_template("tracking.html", role=session.get("user_role"))
 
 
 def get_coordinates(city: str) -> dict:
@@ -585,7 +602,7 @@ def get_tracking_data(tracking_number):
         origin_coords = safe_coords(origin)
         destination_coords = safe_coords(destination)
 
-        progress = 65
+        progress = 0
 
         current_coords = get_current_location(
             origin_coords,
@@ -713,6 +730,135 @@ def download_reports_pdf():
             cursor.close()
         if db_conn:
             db_conn.close()
+
+
+@app.route("/api/users")
+def get_all_users():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if session.get('user_role') != 'admin':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 5))
+    search = request.args.get('search', '')
+
+    offset = (page - 1) * limit
+    search_term = f"%{search}%"
+
+    db_conn = get_db_connection()
+    cursor = db_conn.cursor(dictionary=True)
+
+    # 🔍 Data
+    cursor.execute("""
+        SELECT id, name, email, role, created_at
+        FROM users
+        WHERE name LIKE %s OR email LIKE %s
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+    """, (search_term, search_term, limit, offset))
+
+    users = cursor.fetchall()
+
+    # 📊 Count
+    cursor.execute("""
+        SELECT COUNT(*) as total
+        FROM users
+        WHERE name LIKE %s OR email LIKE %s
+    """, (search_term, search_term))
+
+    total = cursor.fetchone()['total']
+
+    # Format date
+    for u in users:
+        if isinstance(u.get('created_at'), datetime):
+            u['created_at'] = u['created_at'].strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.close()
+    db_conn.close()
+
+    return jsonify({
+        'success': True,
+        'data': users,
+        'pagination': {
+            'total': total,
+            'page': page,
+            'limit': limit,
+            'pages': (total + limit - 1) // limit
+        }
+    })
+
+
+@app.route("/api/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    if user_id == session['user_id']:
+        return jsonify({'error': 'Cannot delete yourself'})
+
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if session.get('user_role') != 'admin':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+
+    db_conn = get_db_connection()
+    cursor = db_conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM users WHERE id=%s", (user_id,))
+        db_conn.commit()
+
+        return jsonify({'success': True, 'message': 'User deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+    finally:
+        cursor.close()
+        db_conn.close()
+
+
+@app.route("/api/users/<int:user_id>", methods=["PUT"])
+def update_user(user_id):
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if session.get('user_role') != 'admin':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+
+    data = request.json
+    name = data.get('name')
+    email = data.get('email')
+    role = data.get('role')
+
+    db_conn = get_db_connection()
+    cursor = db_conn.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE users
+            SET name=%s, email=%s, role=%s
+            WHERE id=%s
+        """, (name, email, role, user_id))
+
+        db_conn.commit()
+
+        return jsonify({'success': True, 'message': 'User updated'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+    finally:
+        cursor.close()
+        db_conn.close()
+
+
+@app.route("/users")
+def users_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    if session.get('user_role') != 'admin':
+        return "Forbidden", 403
+
+    return render_template("users.html", role=session.get("user_role"))
+
 
 @app.route("/welcome")
 def welcome():

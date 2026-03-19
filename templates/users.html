@@ -1,0 +1,196 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2 style="margin-bottom: 20px;">👥 User Management</h2>
+
+<!-- SEARCH -->
+<div class="card" style="margin-bottom:20px;">
+  <input 
+    type="text" 
+    id="searchInput" 
+    placeholder="Search users..."
+    style="padding:12px; width:300px; border:1px solid #ccc; border-radius:8px;"
+  >
+</div>
+
+<!-- TABLE -->
+<div class="card">
+  <table id="userTable">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Created</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- PAGINATION -->
+  <div id="pagination" style="margin-top:20px;"></div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" style="
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #22c55e;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 8px;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+">
+  Success
+</div>
+
+<style>
+input, select {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  width: 90%;
+}
+
+/* BUTTONS */
+.btn-edit { background: #f59e0b; color: white; }
+.btn-delete { background: #ef4444; color: white; }
+.btn-save { background: #22c55e; color: white; }
+
+/* DISABLED SAVE */
+.btn-save:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* PAGINATION */
+#pagination button {
+  margin: 4px;
+  padding: 6px 12px;
+  border: none;
+  background: #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#pagination button.active {
+  background: var(--secondary);
+  color: white;
+}
+
+#pagination button:hover {
+  background: #cbd5f5;
+}
+</style>
+
+<script>
+let currentPage = 1;
+let currentSearch = "";
+
+async function loadUsers(page = 1) {
+    const res = await fetch(`/api/users?page=${page}&search=${currentSearch}`);
+    const data = await res.json();
+
+    const tbody = document.querySelector("#userTable tbody");
+
+    tbody.innerHTML = data.data.map(u => `
+        <tr>
+            <td><input value="${u.name}" id="name-${u.id}" disabled></td>
+            <td><input value="${u.email}" id="email-${u.id}" disabled></td>
+            <td>
+                <select id="role-${u.id}" disabled>
+                    <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
+                    <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                </select>
+            </td>
+            <td>${u.created_at}</td>
+
+            <td>
+                <button class="btn btn-edit" onclick="enableEdit(${u.id})">Edit</button>
+                <button class="btn btn-save" id="save-${u.id}" onclick="saveUser(${u.id})" disabled>Save</button>
+                <button class="btn btn-delete" onclick="deleteUser(${u.id})">Delete</button>
+            </td>
+        </tr>
+    `).join("");
+
+    renderPagination(data.pagination);
+}
+
+function enableEdit(id) {
+    document.getElementById(`name-${id}`).disabled = false;
+    document.getElementById(`email-${id}`).disabled = false;
+    document.getElementById(`role-${id}`).disabled = false;
+
+    document.getElementById(`save-${id}`).disabled = false;
+}
+
+/* TOAST FUNCTION */
+function showToast(message) {
+    const toast = document.getElementById("toast");
+    toast.innerText = message;
+    toast.style.display = "block";
+
+    setTimeout(() => {
+        toast.style.display = "none";
+    }, 2000);
+}
+
+async function saveUser(id) {
+    const name = document.getElementById(`name-${id}`).value;
+    const email = document.getElementById(`email-${id}`).value;
+    const role = document.getElementById(`role-${id}`).value;
+
+    await fetch(`/api/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, role })
+    });
+
+    showToast("User updated successfully ✅");
+    loadUsers(currentPage);
+}
+
+async function deleteUser(id) {
+    if (!confirm("Delete this user?")) return;
+
+    await fetch(`/api/users/${id}`, {
+        method: "DELETE"
+    });
+
+    showToast("User deleted 🗑️");
+    loadUsers(currentPage);
+}
+
+function renderPagination(pagination) {
+    const container = document.getElementById("pagination");
+
+    let btns = "";
+    for (let i = 1; i <= pagination.pages; i++) {
+        btns += `
+          <button 
+            class="${i === currentPage ? 'active' : ''}" 
+            onclick="changePage(${i})">
+            ${i}
+          </button>`;
+    }
+
+    container.innerHTML = btns;
+}
+
+function changePage(p) {
+    currentPage = p;
+    loadUsers(p);
+}
+
+document.getElementById("searchInput").addEventListener("input", (e) => {
+    currentSearch = e.target.value;
+    loadUsers(1);
+});
+
+document.addEventListener("DOMContentLoaded", () => loadUsers());
+</script>
+
+{% endblock %}

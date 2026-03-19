@@ -1,229 +1,90 @@
 {% extends "layout.html" %} {% block content %}
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin Dashboard - Shipments</title>
-    <style>
-      body {
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background: #eef2f7;
-        margin: 0;
-        padding: 0;
-      }
+<h2 style="margin-bottom: 25px; font-size: 22px; font-weight: 600">
+  🚢 Admin Dashboard
+</h2>
 
-      /* HEADER */
-      header {
-        background: linear-gradient(135deg, #0f172a, #1e293b);
-        color: white;
-        padding: 18px 30px;
-        font-size: 22px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-      }
+<!-- CARDS -->
+<div
+  style="
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+  "
+>
+  <div class="card" style="padding: 20px;">
+    <h4>Total Shipments</h4>
+    <p id="totalShipments">0</p>
+  </div>
 
-      /* CONTAINER */
-      .container {
-        max-width: 1200px;
-        margin: auto;
-        padding: 30px 20px;
-      }
+  <div class="card" style="padding: 20px;">
+    <h4>In Transit</h4>
+    <p id="inTransit">0</p>
+  </div>
 
-      /* CARDS */
-      .cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 20px;
-        margin-bottom: 25px;
-      }
+  <div class="card" style="padding: 20px;">
+    <h4>Urgent Shipments</h4>
+    <p id="urgent">0</p>
+  </div>
+</div>
 
-      .card {
-        background: white;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
-      }
+<!-- TABLE -->
+<div class="card" style="padding: 20px;">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Origin</th>
+        <th>Destination</th>
+        <th>Status</th>
+        <th>Tracking</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="shipmentTable"></tbody>
+  </table>
+</div>
 
-      .card:hover {
-        transform: translateY(-5px);
-      }
+<script>
+  fetch("/api/shipments")
+    .then((res) => res.json())
+    .then((res) => {
+      const shipments = res.data;
+      const table = document.getElementById("shipmentTable");
 
-      .card h3 {
-        margin: 0;
-        font-size: 14px;
-        color: #64748b;
-      }
+      let total = shipments.length;
+      let inTransit = 0;
+      let urgent = 0;
 
-      .card p {
-        font-size: 26px;
-        font-weight: bold;
-        margin-top: 10px;
-        color: #0f172a;
-      }
+      shipments.forEach((s) => {
+        if (s.status === "in-transit") inTransit++;
+        if (s.priority === "Urgent") urgent++;
 
-      /* TABLE */
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      }
+        table.innerHTML += `
+        <tr>
+          <td>${s.id}</td>
+          <td>${s.origin}</td>
+          <td>${s.destination}</td>
+          <td>${s.status}</td>
+          <td>${s.tracking_number}</td>
+          <td>
+            <button class="btn" onclick="goToTracking('${s.tracking_number}')">
+              Track
+            </button>
+          </td>
+        </tr>
+      `;
+      });
 
-      th,
-      td {
-        padding: 14px;
-        text-align: left;
-      }
+      document.getElementById("totalShipments").innerText = total;
+      document.getElementById("inTransit").innerText = inTransit;
+      document.getElementById("urgent").innerText = urgent;
+    });
 
-      th {
-        background: #f1f5f9;
-        font-size: 13px;
-        text-transform: uppercase;
-        color: #475569;
-      }
-
-      tr:nth-child(even) {
-        background: #f9fafb;
-      }
-
-      tr:hover {
-        background: #eef2ff;
-      }
-
-      /* STATUS BADGES */
-      .status {
-        padding: 6px 10px;
-        border-radius: 20px;
-        font-size: 12px;
-        color: white;
-        text-transform: capitalize;
-      }
-
-      .in-transit {
-        background: #f59e0b;
-      }
-
-      .delivered {
-        background: #22c55e;
-      }
-
-      .pending {
-        background: #6b7280;
-      }
-
-      /* BUTTON */
-      .track-btn {
-        padding: 6px 12px;
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 13px;
-        transition: all 0.3s ease;
-      }
-
-      .track-btn:hover {
-        transform: scale(1.05);
-        background: linear-gradient(135deg, #1d4ed8, #3b82f6);
-      }
-    </style>
-  </head>
-  <body>
-    <header>🚢 Admin Dashboard - Shipments</header>
-
-    <div class="container">
-      <!-- Stats Cards -->
-      <div class="cards">
-        <div class="card">
-          <h3>Total Shipments</h3>
-          <p id="totalShipments">0</p>
-        </div>
-
-        <div class="card">
-          <h3>In Transit</h3>
-          <p id="inTransit">0</p>
-        </div>
-
-        <div class="card">
-          <h3>Urgent Shipments</h3>
-          <p id="urgent">0</p>
-        </div>
-      </div>
-
-      <!-- Table -->
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Origin</th>
-            <th>Destination</th>
-            <th>Priority</th>
-            <th>Status</th>
-            <th>Tracking</th>
-            <th>Created At</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="shipmentTable"></tbody>
-      </table>
-    </div>
-
-    <script>
-      fetch("/api/shipments")
-        .then((res) => res.json())
-        .then((res) => {
-          const shipments = res.data;
-          const table = document.getElementById("shipmentTable");
-
-          let total = shipments.length;
-          let inTransit = 0;
-          let urgent = 0;
-
-          shipments.forEach((s) => {
-            if (s.status === "in-transit") inTransit++;
-            if (s.priority === "Urgent") urgent++;
-
-            const row = `
-  <tr>
-    <td>${s.id}</td>
-    <td>${s.origin}</td>
-    <td>${s.destination}</td>
-    <td>${s.priority}</td>
-    <td><span class="status ${s.status}">${s.status}</span></td>
-    <td>${s.tracking_number}</td>
-    <td>${s.created_at}</td>
-    <td>
-      <button class="track-btn" onclick="goToTracking('${s.tracking_number}')"" 
-        style="padding:6px 10px; background:#3282b8; color:white; border:none; border-radius:5px; cursor:pointer;">
-        Track
-      </button>
-    </td>
-  </tr>
-`;
-
-            table.innerHTML += row;
-          });
-
-          document.getElementById("totalShipments").innerText = total;
-          document.getElementById("inTransit").innerText = inTransit;
-          document.getElementById("urgent").innerText = urgent;
-        })
-        .catch((err) => {
-          console.error("Error fetching shipments:", err);
-        });
-
-      function goToTracking(trackingNumber) {
-        window.location.href = `/tracking?tracking=${trackingNumber}`;
-      }
-    </script>
-  </body>
-</html>
+  function goToTracking(trackingNumber) {
+    window.location.href = `/tracking?tracking=${trackingNumber}`;
+  }
+</script>
 
 {% endblock %}
-

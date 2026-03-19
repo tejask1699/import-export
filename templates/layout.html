@@ -1,55 +1,219 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
+  <head>
     <title>{{ title }}</title>
+
     <style>
-        body { margin: 0; font-family: Arial; display: flex; }
+      :root {
+        --primary: #0f4c75;
+        --secondary: #3282b8;
+        --bg: #eef2f7;
+        --card-bg: #ffffff;
+        --text: #1e293b;
+      }
 
-        .sidebar {
-            width: 220px;
-            background: #0f4c75;
-            color: white;
-            height: 100vh;
-            padding: 20px;
-            position: fixed;
-        }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        display: flex;
+        background: var(--bg);
+        color: var(--text);
+      }
 
-        .sidebar a {
-            display: block;
-            color: white;
-            text-decoration: none;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
+      /* SIDEBAR */
+      .sidebar {
+        width: 220px;
+        padding: 25px 15px;
+        background: var(--primary);
+        color: white;
+        height: 100vh;
+        position: fixed;
+      }
 
-        .sidebar a:hover {
-            background: #3282b8;
-        }
+      .sidebar h2 {
+        margin-bottom: 20px;
+      }
 
-        .main {
-            margin-left: 240px;
-            padding: 20px;
-            width: 100%;
-        }
+      .sidebar a {
+        display: block;
+        color: white;
+        text-decoration: none;
+        padding: 12px;
+        margin-bottom: 10px;
+        border-radius: 6px;
+        transition: 0.2s;
+      }
+
+      .sidebar a.active {
+        background: var(--secondary);
+        font-weight: 600;
+        position: relative;
+      }
+
+      .sidebar a.active::before {
+        content: "";
+        position: absolute;
+        left: -10px;
+        top: 8px;
+        height: 70%;
+        width: 4px;
+        background: white;
+        border-radius: 4px;
+      }
+
+      .sidebar a:hover {
+        background: var(--secondary);
+      }
+
+      h2 {
+        margin-top: 5px;
+      }
+
+      /* MAIN CONTENT */
+      .main {
+        margin-left: 240px;
+        padding: 30px 40px; /* increased */
+        width: 100%;
+      }
+
+      /* GLOBAL CARD */
+      .card {
+        background: var(--card-bg);
+        padding: 25px; /* increased */
+        border-radius: 14px;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+      }
+
+      .card h4 {
+        margin: 0;
+        font-size: 14px;
+        color: #64748b;
+      }
+
+      .card p {
+        font-size: 28px;
+        font-weight: 600;
+        margin-top: 10px;
+      }
+
+      /* TABLE GLOBAL */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 16px; /* increased */
+      }
+
+      th {
+        background: #f1f5f9;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+      }
+
+      tr:hover {
+        background: #f8fafc;
+      }
+
+      tr:nth-child(even) {
+        background: #f9fafb;
+      }
+
+      /* BUTTON */
+      .btn {
+        padding: 6px 12px;
+        background: var(--secondary);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      .btn:hover {
+        opacity: 0.9;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
+    <div class="sidebar">
+      <h2>🚚 Shipping</h2>
 
-<div class="sidebar">
-    <h2>🚚 Shipping</h2>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/shipping">Create Shipment</a>
-    <a href="/tracking">Track Shipment</a>
-    <a href="/weather">Weather Tracker</a>
-    <a href="/reports">Reports</a>
+      {% if role != 'admin' %}
+      <a
+        href="/dashboard"
+        class="{% if request.path == '/dashboard' %}active{% endif %}"
+      >
+        Dashboard
+      </a>
+      <a
+        href="/shipping"
+        class="{% if request.path == '/shipping' %}active{% endif %}"
+      >
+        Create Shipment
+      </a>
+      <a
+        href="/tracking"
+        class="{% if request.path.startswith('/tracking') %}active{% endif %}"
+      >
+        Track Shipment
+      </a>
+      <a
+        href="/weather"
+        class="{% if request.path == '/weather' %}active{% endif %}"
+      >
+        Weather
+      </a>
+      <a
+        href="/reports"
+        class="{% if request.path.startswith('/reports') %}active{% endif %}"
+      >
+        Reports
+      </a>
+      {% endif %} {% if role == 'admin' %}
+      <a
+        href="/admin"
+        class="{% if request.path == '/admin' %}active{% endif %}"
+      >
+        Admin Dashboard
+      </a>
+      <a
+        href="/users"
+        class="{% if request.path.startswith('/users') %}active{% endif %}"
+      >
+        Users
+      </a>
+      <a
+        href="/shipping"
+        class="{% if request.path == '/shipping' %}active{% endif %}"
+      >
+        Create Shipment
+      </a>
+      <a
+        href="/tracking"
+        class="{% if request.path.startswith('/tracking') %}active{% endif %}"
+      >
+        Track Shipment
+      </a>
+      <a
+        href="/weather"
+        class="{% if request.path == '/weather' %}active{% endif %}"
+      >
+        Weather
+      </a>
+      <a
+        href="/reports"
+        class="{% if request.path.startswith('/reports') %}active{% endif %}"
+      >
+        Reports
+      </a>
+      {% endif %}
 
-    <a href="/logout">Logout</a>
-</div>
+      <a href="/logout">Logout</a>
+    </div>
 
-<div class="main">
-    {% block content %}{% endblock %}
-</div>
-
-</body>
+    <div class="main">{% block content %}{% endblock %}</div>
+  </body>
 </html>
