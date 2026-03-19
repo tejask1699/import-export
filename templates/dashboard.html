@@ -1,148 +1,221 @@
-{% extends "layout.html" %}
-
-{% block content %}
+{% extends "layout.html" %} {% block content %}
 
 <h1>📊 Dashboard</h1>
 
+<!-- Search -->
+<input
+  type="text"
+  id="searchInput"
+  placeholder="Search by tracking / city..."
+  style="padding: 10px; margin-bottom: 15px; width: 300px"
+/>
+
 <!-- Stats Cards -->
 <div class="cards">
-    <div class="card">
-        <h3>Total Shipments</h3>
-        <p id="total">0</p>
-    </div>
-    <div class="card">
-        <h3>In Transit</h3>
-        <p id="inTransit">0</p>
-    </div>
-    <div class="card">
-        <h3>Delivered</h3>
-        <p id="delivered">0</p>
-    </div>
-    <div class="card">
-        <h3>Delayed</h3>
-        <p id="delayed">0</p>
-    </div>
+  <div class="card">
+    <h3>Total</h3>
+    <p id="total">0</p>
+  </div>
+  <div class="card">
+    <h3>In Transit</h3>
+    <p id="inTransit">0</p>
+  </div>
+  <div class="card">
+    <h3>Delivered</h3>
+    <p id="delivered">0</p>
+  </div>
+  <div class="card">
+    <h3>Delayed</h3>
+    <p id="delayed">0</p>
+  </div>
 </div>
 
-<!-- Shipment Table -->
-<h2>📦 Recent Shipments</h2>
+<!-- Table -->
+<h2>📦 Shipments</h2>
 
 <table id="shipmentTable">
-    <thead>
-        <tr>
-            <th>Tracking</th>
-            <th>Route</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody></tbody>
+  <thead>
+    <tr>
+      <th>Tracking</th>
+      <th>Route</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
 </table>
 
+<!-- Pagination -->
+<div id="pagination" style="margin-top: 15px"></div>
+
 <style>
-.cards {
+  .cards {
     display: flex;
     gap: 20px;
     margin-bottom: 20px;
-}
+  }
 
-.card {
+  .card {
     flex: 1;
     background: white;
     padding: 20px;
     border-radius: 10px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-}
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+  }
 
-.card h3 {
+  .card h3 {
     margin: 0;
     color: #0f4c75;
-}
+  }
 
-.card p {
+  .card p {
     font-size: 26px;
     font-weight: bold;
     margin-top: 10px;
-}
+  }
 
-/* Table */
-table {
+  table {
     width: 100%;
     background: white;
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-}
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+  }
 
-th, td {
+  th,
+  td {
     padding: 12px;
     border-bottom: 1px solid #ddd;
-    text-align: left;
-}
+  }
 
-tr:hover {
+  tr:hover {
     background: #f1f1f1;
     cursor: pointer;
-}
+  }
 
-/* Status Colors */
-.status {
+  .status {
     padding: 4px 8px;
     border-radius: 5px;
     color: white;
     font-size: 12px;
-}
+  }
 
-.in-transit { background: #ffc107; color: black; }
-.delivered { background: #28a745; }
-.pending { background: #6c757d; }
-.delayed { background: #dc3545; }
+  .in-transit {
+    background: #ffc107;
+    color: black;
+  }
+  .delivered {
+    background: #28a745;
+  }
+  .pending {
+    background: #6c757d;
+  }
+  .delayed {
+    background: #dc3545;
+  }
 
+  button {
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    background: #eee;
+    cursor: pointer;
+  }
+
+  button.active {
+    background: #0f4c75;
+    color: white;
+  }
 </style>
 
 <script>
-async function loadDashboard() {
+  let currentPage = 1;
+  let currentSearch = "";
+
+  async function loadDashboard(page = 1, search = "") {
     try {
-        const res = await fetch('/api/shipments');
-        const data = await res.json();
+      const res = await fetch(
+        `/api/user-reports?page=${page}&limit=5&search=${search}`,
+      );
+      const data = await res.json();
 
-        const shipments = data.data;
+      const shipments = data.data;
 
-        // Stats
-        document.getElementById('total').innerText = shipments.length;
-        document.getElementById('inTransit').innerText =
-            shipments.filter(s => s.status === 'in-transit').length;
-        document.getElementById('delivered').innerText =
-            shipments.filter(s => s.status === 'delivered').length;
-        document.getElementById('delayed').innerText =
-            shipments.filter(s => s.status === 'delayed').length;
+      // ✅ Stats
+      if (data.stats) {
+        document.getElementById("total").innerText = data.stats.total;
+        document.getElementById("inTransit").innerText = data.stats.in_transit;
+        document.getElementById("delivered").innerText = data.stats.delivered;
+        document.getElementById("delayed").innerText = data.stats.delayed;
+      }
 
-        // Table
-        const tbody = document.querySelector('#shipmentTable tbody');
+      // ✅ Table
+      const tbody = document.querySelector("#shipmentTable tbody");
 
-        tbody.innerHTML = shipments.map(s => `
-            <tr onclick="goTrack('${s.tracking_number}')">
-                <td>${s.tracking_number}</td>
-                <td>${s.origin} → ${s.destination}</td>
-                <td>
-                    <span class="status ${s.status}">
-                        ${s.status}
-                    </span>
-                </td>
-            </tr>
-        `).join('');
+      if (shipments.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3">No shipments found</td></tr>`;
+      } else {
+        tbody.innerHTML = shipments
+          .map(
+            (s) => `
+                <tr onclick="goTrack('${s.tracking_number}')">
+                    <td>${s.tracking_number}</td>
+                    <td>${s.origin} → ${s.destination}</td>
+                    <td>
+                        <span class="status ${s.status}">
+                            ${s.status}
+                        </span>
+                    </td>
+                </tr>
+            `,
+          )
+          .join("");
+      }
 
+      // ✅ Pagination
+      renderPagination(data.pagination);
     } catch (err) {
-        console.error("Dashboard load failed", err);
+      console.error("Dashboard load failed", err);
     }
-}
+  }
 
-// Redirect to tracking
-function goTrack(trackingNumber) {
+  function renderPagination(pagination) {
+    const container = document.getElementById("pagination");
+
+    let buttons = "";
+
+    for (let i = 1; i <= pagination.pages; i++) {
+      buttons += `
+            <button class="${i === pagination.page ? "active" : ""}"
+                onclick="changePage(${i})">
+                ${i}
+            </button>
+        `;
+    }
+
+    container.innerHTML = buttons;
+  }
+
+  function changePage(page) {
+    currentPage = page;
+    loadDashboard(currentPage, currentSearch);
+  }
+
+  // 🔍 Search
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    currentSearch = e.target.value;
+    currentPage = 1;
+    loadDashboard(currentPage, currentSearch);
+  });
+
+  // Redirect
+  function goTrack(trackingNumber) {
     window.location.href = `/tracking?tracking=${trackingNumber}`;
-}
+  }
 
-// Init
-document.addEventListener('DOMContentLoaded', loadDashboard);
+  // Init
+  document.addEventListener("DOMContentLoaded", () => {
+    loadDashboard();
+  });
 </script>
 
 {% endblock %}

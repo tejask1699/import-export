@@ -1,221 +1,318 @@
-{% extends "layout.html" %}
-
-{% block content %}
+{% extends "layout.html" %} {% block content %}
 
 <h1>📊 My Shipment Reports</h1>
 
-<!-- Stats -->
-<div class="cards">
-    <div class="card">
-        <h3>Total</h3>
-        <p id="total">0</p>
-    </div>
-    <div class="card">
-        <h3>In Transit</h3>
-        <p id="inTransit">0</p>
-    </div>
-    <div class="card">
-        <h3>Delivered</h3>
-        <p id="delivered">0</p>
-    </div>
-    <div class="card">
-        <h3>Delayed</h3>
-        <p id="delayed">0</p>
-    </div>
-</div>
+<!-- 🔍 Search + Filter -->
+<div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap">
+  <input
+    type="text"
+    id="searchInput"
+    placeholder="Search tracking / city..."
+    style="padding: 10px; width: 250px"
+  />
 
-<!-- Filter -->
-<select id="filter" onchange="filterTable()">
+  <button id="reportBtn">📄 Reports</button>
+  <select id="filter" onchange="filterTable()">
     <option value="">All</option>
     <option value="in-transit">In Transit</option>
     <option value="delivered">Delivered</option>
     <option value="delayed">Delayed</option>
-</select>
+  </select>
+</div>
+
+<!-- Stats -->
+<div class="cards">
+  <div class="card">
+    <h3>Total</h3>
+    <p id="total">0</p>
+  </div>
+  <div class="card">
+    <h3>In Transit</h3>
+    <p id="inTransit">0</p>
+  </div>
+  <div class="card">
+    <h3>Delivered</h3>
+    <p id="delivered">0</p>
+  </div>
+  <div class="card">
+    <h3>Delayed</h3>
+    <p id="delayed">0</p>
+  </div>
+</div>
 
 <!-- Table -->
 <table id="reportTable">
-    <thead>
-        <tr>
-            <th>Tracking</th>
-            <th>Route</th>
-            <th>Status</th>
-            <th>Date</th>
-        </tr>
-    </thead>
-    <tbody></tbody>
+  <thead>
+    <tr>
+      <th>Tracking</th>
+      <th>Route</th>
+      <th>Status</th>
+      <th>Date</th>
+      {% if role == 'admin' %}
+      <th>User</th>
+      {% endif %}
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
 </table>
+
+<!-- Pagination -->
+<div id="pagination" style="margin-top: 15px"></div>
 
 {% block styles %}
 <style>
-    body {
-        background: #f5f7fb;
-    }
+  body {
+    background: #f5f7fb;
+  }
 
-    /* Header */
-    h1 {
-        margin-bottom: 20px;
-        color: #0f4c75;
-    }
+  h1 {
+    margin-bottom: 20px;
+    color: #0f4c75;
+  }
 
-    /* Cards */
-    .cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 20px;
-        margin-bottom: 25px;
-    }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+    margin-bottom: 25px;
+  }
 
-    .card {
-        background: linear-gradient(135deg, #ffffff, #f1f6fb);
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
-        transition: transform 0.2s ease;
-    }
+  .card {
+    background: linear-gradient(135deg, #ffffff, #f1f6fb);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s ease;
+  }
 
-    .card:hover {
-        transform: translateY(-5px);
-    }
+  .card:hover {
+    transform: translateY(-5px);
+  }
 
-    .card h3 {
-        margin: 0;
-        font-size: 14px;
-        color: #666;
-    }
+  .card h3 {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+  }
 
-    .card p {
-        font-size: 26px;
-        font-weight: bold;
-        margin-top: 10px;
-        color: #0f4c75;
-    }
+  .card p {
+    font-size: 26px;
+    font-weight: bold;
+    margin-top: 10px;
+    color: #0f4c75;
+  }
 
-    /* Filter */
-    #filter {
-        padding: 10px 15px 15px 5px;
-        border-radius: 8px;
-        border: 1px solid #ccc;
-        margin-bottom: 15px;
-        font-size: 14px;
-        cursor: pointer;
-    }
+  /* Filter */
+  #filter {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    cursor: pointer;
+  }
 
-    /* Table */
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
-    }
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+  }
 
-    thead {
-        background: #0f4c75;
-        color: white;
-    }
+  thead {
+    background: #0f4c75;
+    color: white;
+  }
 
-    th {
-        text-align: left;
-        padding: 12px;
-        font-size: 14px;
-    }
+  th {
+    text-align: left;
+    padding: 12px;
+    font-size: 14px;
+  }
 
-    td {
-        padding: 12px;
-        border-bottom: 1px solid #eee;
-        font-size: 14px;
-    }
+  td {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+  }
 
-    tr:hover {
-        background: #f1f6fb;
-        cursor: pointer;
-    }
+  tr:hover {
+    background: #f1f6fb;
+    cursor: pointer;
+  }
 
-    /* Status badges */
-    .status {
-        padding: 5px 10px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: bold;
-    }
+  /* Status badges */
+  .status {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+  }
 
-    .in-transit {
-        background: #fff3cd;
-        color: #856404;
-    }
+  .in-transit {
+    background: #fff3cd;
+    color: #856404;
+  }
 
-    .delivered {
-        background: #d4edda;
-        color: #155724;
-    }
+  .delivered {
+    background: #d4edda;
+    color: #155724;
+  }
 
-    .delayed {
-        background: #f8d7da;
-        color: #721c24;
-    }
+  .delayed {
+    background: #f8d7da;
+    color: #721c24;
+  }
 
-    /* Empty state */
-    td[colspan="4"] {
-        text-align: center;
-        padding: 20px;
-        color: #777;
-    }
+  /* Pagination */
+  #pagination button {
+    margin: 5px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 5px;
+    background: #eee;
+    cursor: pointer;
+  }
+
+  #pagination button.active {
+    background: #0f4c75;
+    color: white;
+  }
+
+  td[colspan="4"] {
+    text-align: center;
+    padding: 20px;
+    color: #777;
+  }
+
+  button {
+    background: #0f4c75;
+    color: white;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #3282b8;
+  }
 </style>
 {% endblock %}
 
 <script>
-    let allShipments = [];
+  const role = "{{ role }}";
+  let currentPage = 1;
+  let currentSearch = "";
+  let currentStatus = "";
 
-    async function loadReports() {
-        const res = await fetch('/api/user-reports');
-        const data = await res.json();
+  const reportBtn = document.getElementById("reportBtn");
 
-        if (!data.success) return;
+  reportBtn.addEventListener("click", () => {
+    window.open("/api/reports/pdf", "_blank");
+  });
+  // 🚀 Load Reports
+  async function loadReports(page = 1) {
+    try {
+      const res = await fetch(
+        `/api/user-reports?page=${page}&limit=5&search=${currentSearch}&status=${currentStatus}`,
+      );
 
-        allShipments = data.data;
+      const data = await res.json();
+      if (!data.success) return;
 
-        document.getElementById('total').innerText = data.stats.total;
-        document.getElementById('inTransit').innerText = data.stats.in_transit;
-        document.getElementById('delivered').innerText = data.stats.delivered;
-        document.getElementById('delayed').innerText = data.stats.delayed;
+      // Stats
+      document.getElementById("total").innerText = data.stats.total;
+      document.getElementById("inTransit").innerText = data.stats.in_transit;
+      document.getElementById("delivered").innerText = data.stats.delivered;
+      document.getElementById("delayed").innerText = data.stats.delayed;
 
-        renderTable(allShipments);
+      renderTable(data.data);
+      renderPagination(data.pagination);
+    } catch (err) {
+      console.error("Error:", err);
+    }
+  }
+
+  // 📦 Render Table
+  function renderTable(shipments) {
+  const tbody = document.querySelector("#reportTable tbody");
+
+  if (!shipments.length) {
+    const colSpan = role === "admin" ? 6 : 5;
+    tbody.innerHTML = `<tr><td colspan="${colSpan}">No shipments found</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = shipments.map(s => {
+    return `
+      <tr>
+        <td>${s.tracking_number}</td>
+        <td>${s.origin} → ${s.destination}</td>
+        <td><span class="status ${s.status}">${s.status}</span></td>
+        <td>${s.created_at ? new Date(s.created_at).toLocaleString() : "-"}</td>
+
+        ${role === "admin" ? `<td>${s.user_name || "-"}</td>` : ""}
+
+        <td>
+          <button onclick="goTrack('${s.tracking_number}')">
+            Track
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+  // 📄 Pagination
+  function renderPagination(pagination) {
+    const container = document.getElementById("pagination");
+
+    let buttons = "";
+
+    for (let i = 1; i <= pagination.pages; i++) {
+      buttons += `
+            <button class="${i === pagination.page ? "active" : ""}"
+                onclick="changePage(${i})">
+                ${i}
+            </button>
+        `;
     }
 
-    function renderTable(shipments) {
-        const tbody = document.querySelector('#reportTable tbody');
+    container.innerHTML = buttons;
+  }
 
-        if (!shipments.length) {
-            tbody.innerHTML = `<tr><td colspan="4">No shipments found</td></tr>`;
-            return;
-        }
+  function changePage(page) {
+    currentPage = page;
+    loadReports(currentPage);
+  }
 
-        tbody.innerHTML = shipments.map(s => `
-        <tr onclick="goTrack('${s.tracking_number}')">
-            <td>${s.tracking_number}</td>
-            <td>${s.origin} → ${s.destination}</td>
-            <td><span class="status ${s.status}">${s.status}</span></td>
-            <td>${s.created_at ? new Date(s.created_at).toLocaleString() : '-'}</td>
-        </tr>
-    `).join('');
-    }
+  // 🔍 Search
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    currentSearch = e.target.value;
+    currentPage = 1;
+    loadReports(currentPage);
+  });
 
-    function filterTable() {
-        const value = document.getElementById('filter').value;
+  // 🎯 Filter
+  function filterTable() {
+    currentStatus = document.getElementById("filter").value;
+    currentPage = 1;
+    loadReports(currentPage);
+  }
 
-        if (!value) {
-            renderTable(allShipments);
-        } else {
-            renderTable(allShipments.filter(s => s.status === value));
-        }
-    }
+  // 🔗 Redirect
+  function goTrack(id) {
+    window.location.href = `/tracking?tracking=${id}`;
+  }
 
-    function goTrack(id) {
-        window.location.href = `/tracking?tracking=${id}`;
-    }
-
-    document.addEventListener('DOMContentLoaded', loadReports);
+  // Init
+  document.addEventListener("DOMContentLoaded", () => {
+    loadReports();
+  });
 </script>
 
 {% endblock %}

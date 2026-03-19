@@ -22,7 +22,7 @@ def get_db_connection():
         host="127.0.0.1",
         port=3306,
         user="root",
-        password="root@1699",
+        password="Tejas@1699",
         database="ai_shipping",
         # charset="utf8",
         # collation="utf8_general_ci"
@@ -40,7 +40,7 @@ def reports_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    return render_template("reports.html")
+    return render_template("reports.html", role=session.get("user_role"))
 
 
 @app.route("/api/user-reports")
@@ -48,51 +48,108 @@ def user_reports():
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'Unauthorized'})
 
-    db_conn = None
-    cursor = None
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 5))
+    search = request.args.get('search', '')
+    status = request.args.get('status', '')
 
-    try:
-        db_conn = get_db_connection()
-        cursor = db_conn.cursor(dictionary=True)
+    offset = (page - 1) * limit
+    search_term = f"%{search}%"
 
-        cursor.execute(
-            "SELECT * FROM shipments WHERE user_id=%s ORDER BY created_at DESC",
-            (session['user_id'],)
+    db_conn = get_db_connection()
+    cursor = db_conn.cursor(dictionary=True)
+
+    # 🔥 BASE QUERY (with JOIN)
+    base_query = """
+        FROM shipments s
+        JOIN users u ON s.user_id = u.id
+        WHERE 1=1
+    """
+
+    params = []
+
+    # ✅ USER FILTER (only for normal users)
+    if session.get('user_role') != 'admin':
+        base_query += " AND s.user_id=%s"
+        params.append(session['user_id'])
+
+    # ✅ SEARCH
+    base_query += """
+        AND (
+            s.tracking_number LIKE %s OR
+            s.origin LIKE %s OR
+            s.destination LIKE %s
         )
-        shipments = cursor.fetchall()
+    """
+    params.extend([search_term, search_term, search_term])
 
-        # ✅ FIX: convert datetime → string
-        for s in shipments:
-            if isinstance(s.get('created_at'), datetime):
-                s['created_at'] = s['created_at'].strftime("%Y-%m-%d %H:%M:%S")
-            if isinstance(s.get('updated_at'), datetime):
-                s['updated_at'] = s['updated_at'].strftime("%Y-%m-%d %H:%M:%S")
+    # ✅ STATUS FILTER
+    if status:
+        base_query += " AND s.status=%s"
+        params.append(status)
 
-        # Stats
-        total = len(shipments)
-        in_transit = len([s for s in shipments if s['status'] == 'in-transit'])
-        delivered = len([s for s in shipments if s['status'] == 'delivered'])
-        delayed = len([s for s in shipments if s['status'] == 'delayed'])
+    # ✅ DATA QUERY (with user_name)
+    data_query = """
+        SELECT s.*, u.name as user_name
+    """ + base_query + """
+        ORDER BY s.created_at DESC
+        LIMIT %s OFFSET %s
+    """
 
-        return jsonify({
-            'success': True,
-            'data': shipments,
-            'stats': {
-                'total': total,
-                'in_transit': in_transit,
-                'delivered': delivered,
-                'delayed': delayed
-            }
-        })
+    cursor.execute(data_query, (*params, limit, offset))
+    shipments = cursor.fetchall()
 
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+    # ✅ COUNT QUERY (same filters, no need to select user fields)
+    count_query = "SELECT COUNT(*) as total " + base_query
+    cursor.execute(count_query, tuple(params))
+    total = cursor.fetchone()['total']
 
-    finally:
-        if cursor:
-            cursor.close()
-        if db_conn:
-            db_conn.close()
+    # ✅ STATS (role-based)
+    if session.get('user_role') == 'admin':
+        cursor.execute("""
+            SELECT status, COUNT(*) as count
+            FROM shipments
+            GROUP BY status
+        """)
+    else:
+        cursor.execute("""
+            SELECT status, COUNT(*) as count
+            FROM shipments
+            WHERE user_id=%s
+            GROUP BY status
+        """, (session['user_id'],))
+
+    stats_data = cursor.fetchall()
+
+    stats = {
+        "total": total,
+        "in_transit": 0,
+        "delivered": 0,
+        "delayed": 0
+    }
+
+    for s in stats_data:
+        if s['status'] == 'in-transit':
+            stats['in_transit'] = s['count']
+        elif s['status'] == 'delivered':
+            stats['delivered'] = s['count']
+        elif s['status'] == 'delayed':
+            stats['delayed'] = s['count']
+
+    cursor.close()
+    db_conn.close()
+
+    return jsonify({
+        'success': True,
+        'data': shipments,
+        'stats': stats,
+        'pagination': {
+            'total': total,
+            'page': page,
+            'limit': limit,
+            'pages': (total + limit - 1) // limit
+        }
+    })
 
 
 @app.route("/register", methods=["POST"])
@@ -164,6 +221,12 @@ def login_db():
 
 @app.route('/admin')
 def admin_dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    if session.get('user_role') != 'admin':
+        return "Unauthorized", 403
+
     return render_template('adminDashboard.html')
 
 
@@ -176,25 +239,22 @@ def shipping():
 
 @app.route('/api/shipments')
 def get_shipments():
-    db_conn = None
-    cursor = None
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
 
-    try:
-        db_conn = get_db_connection()
-        cursor = db_conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM shipments")
-        shipments = cursor.fetchall()
+    if session.get('user_role') != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
 
-        return jsonify({"data": shipments})
+    db_conn = get_db_connection()
+    cursor = db_conn.cursor(dictionary=True)
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    cursor.execute("SELECT * FROM shipments ORDER BY created_at DESC")
+    shipments = cursor.fetchall()
 
-    finally:
-        if cursor:
-            cursor.close()
-        if db_conn:
-            db_conn.close()   # ✅ FIXED
+    cursor.close()
+    db_conn.close()
+
+    return jsonify({"data": shipments})
 
 
 @app.route('/create-shipment', methods=['POST'])
@@ -417,6 +477,10 @@ def get_shipping_recommendation(weather_data):
 def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+
+    if session.get('user_role') == 'admin':
+        return redirect(url_for('admin_dashboard'))
+
     return render_template("dashboard.html")
 
 
@@ -568,21 +632,31 @@ def download_reports_pdf():
         db_conn = get_db_connection()
         cursor = db_conn.cursor(dictionary=True)
 
-        query = """
-        SELECT tracking_number, origin, destination, payment_mode,
-               priority, status, created_at
-        FROM shipments
-        ORDER BY created_at DESC
-        """
+        # ✅ Role-based query
+        if session.get('user_role') == 'admin':
+            query = """
+                SELECT tracking_number, origin, destination, payment_mode,
+                       priority, status, created_at
+                FROM shipments
+                ORDER BY created_at DESC
+            """
+            cursor.execute(query)
 
-        cursor.execute(query)
+        else:
+            query = """
+                SELECT tracking_number, origin, destination, payment_mode,
+                       priority, status, created_at
+                FROM shipments
+                WHERE user_id=%s
+                ORDER BY created_at DESC
+            """
+            cursor.execute(query, (session['user_id'],))
+
         shipments = cursor.fetchall()
 
-        # Create PDF in memory
+        # ✅ Create PDF
         buffer = io.BytesIO()
-
         doc = SimpleDocTemplate(buffer)
-
         styles = getSampleStyleSheet()
 
         elements = []
@@ -620,7 +694,6 @@ def download_reports_pdf():
         ]))
 
         elements.append(table)
-
         doc.build(elements)
 
         buffer.seek(0)
@@ -640,7 +713,6 @@ def download_reports_pdf():
             cursor.close()
         if db_conn:
             db_conn.close()
-
 
 @app.route("/welcome")
 def welcome():
