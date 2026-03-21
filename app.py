@@ -2,7 +2,8 @@ from flask import Flask, request, render_template,redirect, url_for, session,sen
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
-from datetime import datetime
+from datetime import datetime, timezone
+import random
 import io
 import mysql.connector
 import requests
@@ -279,7 +280,7 @@ def create_shipment():
             }), 400
 
         # ✅ Better Tracking Number (more unique)
-        tracking_number = f"TRK-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(100,999)}"
+        tracking_number = f"TRK-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(100,999)}"
 
         db_conn = get_db_connection()
         cursor = db_conn.cursor()
@@ -320,6 +321,60 @@ def create_shipment():
             cursor.close()
         if db_conn:
             db_conn.close()
+
+
+@app.route('/api/forecast/<city>')
+def get_forecast(city):
+    try:
+        url = f"{WEATHER_BASE_URL}/forecast"
+
+        params = {
+            'q': city,
+            'appid': WEATHER_API_KEY,
+            'units': 'metric'
+        }
+
+        response = requests.get(url, params=params)
+        data = response.json()
+
+        if 'list' not in data:
+            return json.dumps({
+                'success': False,
+                'error': data.get('message', 'Failed to fetch forecast')
+            })
+
+        forecast_list = []
+
+        # OpenWeather gives data every 3 hours → we take ~1 per day (every 8th)
+        for item in data['list'][::8]:  # 5 days approx
+            weather_data = {
+                'weather': item['weather'],
+                'main': item['main'],
+                'wind': item['wind'],
+                'visibility': item.get('visibility', 10000),
+                'rain': item.get('rain', {}),
+                'snow': item.get('snow', {})
+            }
+
+            shipping = get_shipping_recommendation(weather_data)
+
+            forecast_list.append({
+                'datetime': item['dt_txt'],
+                'temp': item['main']['temp'],
+                'weather': item['weather'][0]['main'],
+                'shipping': shipping
+            })
+
+        return json.dumps({
+            'success': True,
+            'forecast': forecast_list
+        })
+
+    except Exception as e:
+        return json.dumps({
+            'success': False,
+            'error': str(e)
+        })
 
 
 # Weather Page with API integration
@@ -574,6 +629,8 @@ def get_current_location(origin, destination, progress):
     }
 
 
+from datetime import datetime
+
 @app.route("/api/tracking/<tracking_number>")
 def get_tracking_data(tracking_number):
     if 'user_id' not in session:
@@ -586,8 +643,11 @@ def get_tracking_data(tracking_number):
         db_conn = get_db_connection()
         cursor = db_conn.cursor(dictionary=True)
 
+        # ✅ FIX: include created_at
         cursor.execute(
-            "SELECT origin, destination, status FROM shipments WHERE tracking_number=%s",
+            """SELECT origin, destination, status, created_at, priority 
+               FROM shipments 
+               WHERE tracking_number=%s""",
             (tracking_number,)
         )
         shipment = cursor.fetchone()
@@ -597,30 +657,71 @@ def get_tracking_data(tracking_number):
 
         origin = shipment['origin']
         destination = shipment['destination']
-        status = shipment['status']
+        db_status = shipment['status']
+        created_at = shipment['created_at']
+        priority = shipment.get('priority', 'Standard')
 
+        # 🌍 Coordinates
         origin_coords = safe_coords(origin)
         destination_coords = safe_coords(destination)
 
-        progress = 0
+        # ⏱️ TIME CALCULATION
+        now = datetime.utcnow()
 
+        # ⚠️ Handle timezone mismatch (MySQL usually naive datetime)
+        if created_at.tzinfo is not None:
+            created_at = created_at.replace(tzinfo=None)
+
+        elapsed = (now - created_at).total_seconds()
+
+        # 🧠 Dynamic duration based on priority
+        BASE_DURATION = 48 * 3600  # 48 hrs
+
+        if priority == "Urgent":
+            TOTAL_DURATION = BASE_DURATION * 0.7
+        elif priority == "Standard":
+            TOTAL_DURATION = BASE_DURATION
+        else:
+            TOTAL_DURATION = BASE_DURATION * 1.2
+
+        # 📊 Progress
+        progress = min(max((elapsed / TOTAL_DURATION) * 100, 0), 100)
+        progress = round(progress, 2)
+
+        # 🚚 Auto status sync
+        if progress >= 100:
+            status = "delivered"
+        elif progress > 0:
+            status = "in-transit"
+        else:
+            status = "pending"
+
+        # 📍 Current position
         current_coords = get_current_location(
             origin_coords,
             destination_coords,
             progress
         )
 
+        # ⏳ ETA calculation
+        remaining_seconds = max(TOTAL_DURATION - elapsed, 0)
+        hours = int(remaining_seconds // 3600)
+        minutes = int((remaining_seconds % 3600) // 60)
+
+        eta = f"{hours}h {minutes}m"
+
         return json.dumps({
             'success': True,
             'tracking_number': tracking_number,
-            'status': status,
+            'status': status,  # ✅ use computed status
             'origin': origin,
             'destination': destination,
             'origin_coords': origin_coords,
             'destination_coords': destination_coords,
             'current_coords': current_coords,
             'progress': progress,
-            'eta': '2 days',
+            'eta': eta,
+            'priority': priority,
             'weather_alerts': []
         })
 

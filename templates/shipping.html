@@ -1,6 +1,4 @@
-{% extends "layout.html" %}
-
-{% block content %}
+{% extends "layout.html" %} {% block content %}
 
 <!doctype html>
 <html lang="en">
@@ -13,7 +11,7 @@
         margin: 0;
         padding: 0;
         font-family: Arial, Helvetica, sans-serif;
-        background: linear-gradient(135deg, #0f4c75, #3282b8);
+        /* background: linear-gradient(135deg, #0f4c75, #3282b8); */
         min-height: 100vh;
         color: #333;
       }
@@ -406,7 +404,7 @@
           <div class="header">
             <h1>🚢 AI Shipping System</h1>
             <p>Live Weather Forecasting for Safe Import/Export Shipping</p>
-            
+            <button id="reportBtn">📄 Reports</button>
           </div>
 
       </div>
@@ -810,3 +808,4 @@
 </html>
 
 {% endblock %}
+

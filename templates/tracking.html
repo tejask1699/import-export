@@ -1,18 +1,20 @@
-{% extends "layout.html" %}
-{% block content %}
+{% extends "layout.html" %} {% block content %}
 
-<h2 style="margin-bottom: 20px;">🗺️ Live Shipment Tracking</h2>
+<h2 style="margin-bottom: 20px">🗺️ Live Shipment Tracking</h2>
 
 <!-- TRACK FORM -->
-<div class="card" style="margin-bottom:20px;">
+<div class="card" style="margin-bottom: 20px">
   <h3>📍 Track Shipment</h3>
 
   <form class="control-form" id="trackingForm">
-    <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:15px;">
-
+    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px">
       <div>
         <label>Tracking Number</label>
-        <input id="trackingNumber" placeholder="Enter tracking number" required>
+        <input
+          id="trackingNumber"
+          placeholder="Enter tracking number"
+          required
+        />
       </div>
 
       <div>
@@ -26,33 +28,34 @@
         </select>
       </div>
 
-      <div style="display:flex; align-items:end;">
+      <div style="display: flex; align-items: end">
         <button class="btn">Track</button>
       </div>
-
     </div>
   </form>
 </div>
 
 <!-- MAIN GRID -->
-<div style="display:grid; grid-template-columns:2fr 1fr; gap:20px;">
-
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px">
   <!-- MAP -->
   <div class="card">
     <h3>
-      Live Map 
-      <span style="
-        margin-left:10px;
-        background:#ef4444;
-        color:white;
-        padding:3px 8px;
-        border-radius:20px;
-        font-size:12px;">
+      Live Map
+      <span
+        style="
+          margin-left: 10px;
+          background: #ef4444;
+          color: white;
+          padding: 3px 8px;
+          border-radius: 20px;
+          font-size: 12px;
+        "
+      >
         ● LIVE
       </span>
     </h3>
 
-    <div id="map" style="height:500px; border-radius:10px;"></div>
+    <div id="map" style="height: 500px; border-radius: 10px"></div>
   </div>
 
   <!-- SHIPMENTS -->
@@ -60,63 +63,74 @@
     <h3>📦 Shipments</h3>
     <div id="shipmentsList"></div>
   </div>
-
 </div>
 
 <style>
-input, select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-}
+  input,
+  select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  }
 
-label {
-  font-size: 13px;
-  margin-bottom: 5px;
-  display: block;
-}
+  label {
+    font-size: 13px;
+    margin-bottom: 5px;
+    display: block;
+  }
 
-/* Shipment card */
-.shipment-card {
-  background: #f8fafc;
-  padding: 15px;
-  border-radius: 10px;
-  margin-bottom: 12px;
-  border-left: 4px solid var(--secondary);
-}
+  /* Shipment card */
+  .shipment-card {
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    border-left: 4px solid var(--secondary);
+  }
 
-.shipment-card.active {
-  border-left-color: #22c55e;
-  background: #ecfdf5;
-}
+  .shipment-card.active {
+    border-left-color: #22c55e;
+    background: #ecfdf5;
+  }
 
-.shipment-details {
-  font-size: 13px;
-  color: #555;
-}
+  .shipment-details {
+    font-size: 13px;
+    color: #555;
+  }
 
-.status-badge {
-  display: inline-block;
-  margin-top: 8px;
-  padding: 4px 8px;
-  border-radius: 5px;
-  font-size: 11px;
-  text-transform: uppercase;
-}
+  .status-badge {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
 
-.status-badge.in-transit { background:#facc15; }
-.status-badge.delivered { background:#22c55e; color:white; }
-.status-badge.pending { background:#94a3b8; color:white; }
-.status-badge.delayed { background:#ef4444; color:white; }
+  .status-badge.in-transit {
+    background: #facc15;
+  }
+  .status-badge.delivered {
+    background: #22c55e;
+    color: white;
+  }
+  .status-badge.pending {
+    background: #94a3b8;
+    color: white;
+  }
+  .status-badge.delayed {
+    background: #ef4444;
+    color: white;
+  }
 
-.weather-alert {
-  margin-top:10px;
-  background:#fff3cd;
-  padding:8px;
-  border-radius:6px;
-  font-size:12px;
-}
+  .weather-alert {
+    margin-top: 10px;
+    background: #fff3cd;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
 </style>
 
 <!-- Leaflet -->
@@ -124,48 +138,81 @@ label {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-let map;
-let markers = [];
-let routeLine;
+  let map;
+  let markers = {};
+  let routeLine;
+  let routeCoords = []; // ✅ cache route
+  let currentTrackingNumber = null;
+  let pollingInterval = null;
+  let lastRouteIndex = 0;
+  let isAnimating = false;
 
-/* INIT MAP */
-function initMap() {
-  map = L.map("map").setView([20.5937, 78.9629], 5);
+  /* INIT MAP */
+  function initMap() {
+    map = L.map("map").setView([20.5937, 78.9629], 5);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors",
-  }).addTo(map);
-}
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+  }
 
-/* TRACK FORM */
-document.getElementById("trackingForm")
-.addEventListener("submit", async function (e) {
-  e.preventDefault();
+  /* TRACK FORM (SINGLE HANDLER ✅) */
+  document
+    .getElementById("trackingForm")
+    .addEventListener("submit", async function (e) {
+      e.preventDefault();
 
-  const trackingNumber = document.getElementById("trackingNumber").value;
+      currentTrackingNumber = document.getElementById("trackingNumber").value;
 
-  try {
-    const res = await fetch(`/api/tracking/${trackingNumber}`);
-    const data = await res.json();
+      // stop previous polling
+      if (pollingInterval) clearInterval(pollingInterval);
 
-    if (!data.success) {
-      alert(data.error || "Tracking failed");
-      return;
+      await fetchTracking();
+
+      // start polling every 5 sec
+      pollingInterval = setInterval(fetchTracking, 5000);
+    });
+
+  function animateMarker(marker, start, end, duration = 5000) {
+    const startTime = performance.now();
+
+    function animate(time) {
+      const progress = Math.min((time - startTime) / duration, 1);
+
+      const lat = start.lat + (end.lat - start.lat) * progress;
+      const lng = start.lng + (end.lng - start.lng) * progress;
+
+      marker.setLatLng([lat, lng]);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
     }
 
-    updateShipmentInfo(data);
-    updateMap(data);
-
-  } catch (err) {
-    alert("Server error");
+    requestAnimationFrame(animate);
   }
-});
+  /* FETCH TRACKING */
+  async function fetchTracking() {
+    if (!currentTrackingNumber) return;
 
-/* UI UPDATE */
-function updateShipmentInfo(data) {
-  const container = document.getElementById("shipmentsList");
+    try {
+      const res = await fetch(`/api/tracking/${currentTrackingNumber}`);
+      const data = await res.json();
 
-  container.innerHTML = `
+      if (data.success) {
+        updateShipmentInfo(data);
+        updateMap(data);
+      }
+    } catch (err) {
+      console.error("Tracking error:", err);
+    }
+  }
+
+  /* UI UPDATE */
+  function updateShipmentInfo(data) {
+    const container = document.getElementById("shipmentsList");
+
+    container.innerHTML = `
     <div class="shipment-card active">
       <h4>${data.tracking_number}</h4>
       <div class="shipment-details">
@@ -179,87 +226,128 @@ function updateShipmentInfo(data) {
       </div>
       ${
         data.weather_alerts?.length
-        ? `<div class="weather-alert">⚠️ ${data.weather_alerts.join(", ")}</div>`
-        : ""
+          ? `<div class="weather-alert">⚠️ ${data.weather_alerts.join(", ")}</div>`
+          : ""
       }
     </div>
   `;
-}
-
-/* MAP UPDATE */
-async function updateMap(data) {
-  const origin = data.origin_coords;
-  const destination = data.destination_coords;
-  const current = data.current_coords;
-
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
-  if (routeLine) map.removeLayer(routeLine);
-
-  const originMarker = L.marker([origin.lat, origin.lng]).addTo(map);
-  const destMarker = L.marker([destination.lat, destination.lng]).addTo(map);
-  const currentMarker = L.marker([current.lat, current.lng]).addTo(map);
-
-  markers.push(originMarker, destMarker, currentMarker);
-
-  try {
-    const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/` +
-      `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
-      `?overview=full&geometries=geojson`
-    );
-
-    const routeData = await res.json();
-    const coords = routeData.routes[0].geometry.coordinates;
-    const latLngs = coords.map(c => [c[1], c[0]]);
-
-    routeLine = L.polyline(latLngs, { color: "#3282b8" }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
-
-  } catch {
-    routeLine = L.polyline([
-      [origin.lat, origin.lng],
-      [destination.lat, destination.lng]
-    ]).addTo(map);
-  }
-}
-
-/* EXISTING FUNCTIONS (UNCHANGED) */
-function goTrack(id){ window.location.href=`/tracking?tracking=${id}` }
-
-function getQueryParam(name){
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get(name);
-}
-
-async function autoLoadTracking(){
-  const trackingNumber = getQueryParam("tracking");
-  if (!trackingNumber) return;
-
-  document.getElementById("trackingNumber").value = trackingNumber;
-
-  const res = await fetch(`/api/tracking/${trackingNumber}`);
-  const data = await res.json();
-
-  if (data.success){
-    updateShipmentInfo(data);
-    updateMap(data);
-  }
-}
-
-async function loadShipments(){
-  const res = await fetch("/api/user-reports?limit=10");
-  const data = await res.json();
-
-  const container = document.getElementById("shipmentsList");
-
-  if (!data.data.length){
-    container.innerHTML = `<p>No shipments found</p>`;
-    return;
   }
 
-  container.innerHTML = data.data.map(s=>`
-    <div class="shipment-card ${s.status==="in-transit"?"active":""}">
+  /* MAP UPDATE (Optimized 🚀) */
+  async function updateMap(data) {
+    const origin = data.origin_coords;
+    const destination = data.destination_coords;
+
+    // ✅ Create markers only once
+    if (!markers.origin) {
+      markers.origin = L.marker([origin.lat, origin.lng]).addTo(map);
+      markers.dest = L.marker([destination.lat, destination.lng]).addTo(map);
+    }
+
+    if (!markers.current) {
+      markers.current = L.marker([origin.lat, origin.lng]).addTo(map);
+    }
+
+    // ✅ Fetch route only once
+    if (!routeCoords.length) {
+      try {
+        const res = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/` +
+            `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+            `?overview=full&geometries=geojson`,
+        );
+
+        const routeData = await res.json();
+        const coords = routeData.routes[0].geometry.coordinates;
+
+        routeCoords = coords.map((c) => [c[1], c[0]]);
+
+        routeLine = L.polyline(routeCoords, { color: "#3282b8" }).addTo(map);
+        map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
+      } catch {
+        routeCoords = [
+          [origin.lat, origin.lng],
+          [destination.lat, destination.lng],
+        ];
+      }
+    }
+
+    // 🎯 Move smoothly along route
+    moveSmoothAlongRoute(data.progress);
+  }
+
+  function moveSmoothAlongRoute(progress) {
+    if (!routeCoords.length || !markers.current) return;
+    if (isAnimating) return;
+
+    const rawIndex = Math.floor((progress / 100) * (routeCoords.length - 1));
+
+    const targetIndex = Math.max(lastRouteIndex + 1, rawIndex);
+
+    const startIndex = lastRouteIndex;
+
+    const duration = 4500;
+    const startTime = performance.now();
+
+    isAnimating = true;
+
+    function animate(time) {
+      const t = Math.min((time - startTime) / duration, 1);
+
+      const currentIndex = Math.floor(
+        startIndex + (targetIndex - startIndex) * t,
+      );
+
+      const point = routeCoords[currentIndex];
+      markers.current.setLatLng(point);
+
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        lastRouteIndex = targetIndex;
+        isAnimating = false;
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+  /* EXISTING FUNCTIONS */
+  function goTrack(id) {
+    window.location.href = `/tracking?tracking=${id}`;
+  }
+
+  function getQueryParam(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+  }
+
+  async function autoLoadTracking() {
+    const trackingNumber = getQueryParam("tracking");
+    if (!trackingNumber) return;
+
+    document.getElementById("trackingNumber").value = trackingNumber;
+
+    currentTrackingNumber = trackingNumber;
+    await fetchTracking();
+
+    pollingInterval = setInterval(fetchTracking, 5000);
+  }
+
+  async function loadShipments() {
+    const res = await fetch("/api/user-reports?limit=10");
+    const data = await res.json();
+
+    const container = document.getElementById("shipmentsList");
+
+    if (!data.data.length) {
+      container.innerHTML = `<p>No shipments found</p>`;
+      return;
+    }
+
+    container.innerHTML = data.data
+      .map(
+        (s) => `
+    <div class="shipment-card ${s.status === "in-transit" ? "active" : ""}">
       <h4>${s.tracking_number}</h4>
       <div class="shipment-details">
         <strong>${s.origin} → ${s.destination}</strong>
@@ -268,15 +356,17 @@ async function loadShipments(){
       </div>
       <button class="btn" onclick="goTrack('${s.tracking_number}')">Track</button>
     </div>
-  `).join("");
-}
+  `,
+      )
+      .join("");
+  }
 
-/* INIT */
-document.addEventListener("DOMContentLoaded", ()=>{
-  initMap();
-  loadShipments();
-  autoLoadTracking();
-});
+  /* INIT */
+  document.addEventListener("DOMContentLoaded", () => {
+    initMap();
+    loadShipments();
+    autoLoadTracking();
+  });
 </script>
 
 {% endblock %}
