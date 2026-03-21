@@ -144,7 +144,7 @@
   let routeCoords = []; // ✅ cache route
   let currentTrackingNumber = null;
   let pollingInterval = null;
-  let lastRouteIndex = 0;
+  let lastExactIndex = 0;
   let isAnimating = false;
 
   /* INIT MAP */
@@ -162,7 +162,20 @@
     .addEventListener("submit", async function (e) {
       e.preventDefault();
 
-      currentTrackingNumber = document.getElementById("trackingNumber").value;
+      const newTrackingNumber = document.getElementById("trackingNumber").value;
+
+      if (currentTrackingNumber !== newTrackingNumber) {
+        currentTrackingNumber = newTrackingNumber;
+        
+        lastExactIndex = 0;
+        routeCoords = [];
+        if (markers.origin) map.removeLayer(markers.origin);
+        if (markers.dest) map.removeLayer(markers.dest);
+        if (markers.current) map.removeLayer(markers.current);
+        if (routeLine) map.removeLayer(routeLine);
+        markers = {};
+        routeLine = null;
+      }
 
       // stop previous polling
       if (pollingInterval) clearInterval(pollingInterval);
@@ -245,7 +258,13 @@
     }
 
     if (!markers.current) {
-      markers.current = L.marker([origin.lat, origin.lng]).addTo(map);
+      const truckIcon = L.divIcon({
+        html: '<div class="truck-icon-inner" style="font-size: 32px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.3)); transition: transform 0.2s; display: inline-block;">🚚</div>',
+        className: '', // Removes default leaflet white square
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+      });
+      markers.current = L.marker([origin.lat, origin.lng], {icon: truckIcon}).addTo(map);
     }
 
     // ✅ Fetch route only once
@@ -280,31 +299,58 @@
     if (!routeCoords.length || !markers.current) return;
     if (isAnimating) return;
 
-    const rawIndex = Math.floor((progress / 100) * (routeCoords.length - 1));
+    const rawProgress = Math.min(Math.max(progress, 0), 100) / 100;
+    const targetExactIndex = rawProgress * (routeCoords.length - 1);
+    const startExactIndex = lastExactIndex;
 
-    const targetIndex = Math.max(lastRouteIndex + 1, rawIndex);
+    if (Math.abs(targetExactIndex - startExactIndex) < 0.001) {
+        return;
+    }
 
-    const startIndex = lastRouteIndex;
-
-    const duration = 4500;
-    const startTime = performance.now();
+    const duration = 2000;
+    let startTime = null;
 
     isAnimating = true;
 
     function animate(time) {
+      if (!startTime) startTime = time;
       const t = Math.min((time - startTime) / duration, 1);
+      
+      const currentExactIndex = startExactIndex + (targetExactIndex - startExactIndex) * t;
 
-      const currentIndex = Math.floor(
-        startIndex + (targetIndex - startIndex) * t,
-      );
+      // Safely clamp the index just in case
+      const safeIndex = Math.max(0, currentExactIndex);
+      const lowerIndex = Math.floor(safeIndex);
+      const upperIndex = Math.min(lowerIndex + 1, routeCoords.length - 1);
+      const fraction = safeIndex - lowerIndex;
 
-      const point = routeCoords[currentIndex];
-      markers.current.setLatLng(point);
+      const p1 = routeCoords[lowerIndex];
+      const p2 = routeCoords[upperIndex];
+      
+      if (!p1 || !p2) {
+          requestAnimationFrame(animate);
+          return;
+      }
+      
+      const lat = p1[0] + (p2[0] - p1[0]) * fraction;
+      const lng = p1[1] + (p2[1] - p1[1]) * fraction;
+
+      markers.current.setLatLng([lat, lng]);
+
+      // Flip the truck icon based on travel direction (left or right)
+      const el = markers.current.getElement();
+      if (el) {
+          const truckIconInner = el.querySelector('.truck-icon-inner');
+          if (truckIconInner && p2[1] !== p1[1]) {
+              const dx = p2[1] - p1[1];
+              truckIconInner.style.transform = dx < 0 ? 'scaleX(-1)' : 'scaleX(1)';
+          }
+      }
 
       if (t < 1) {
         requestAnimationFrame(animate);
       } else {
-        lastRouteIndex = targetIndex;
+        lastExactIndex = targetExactIndex;
         isAnimating = false;
       }
     }
