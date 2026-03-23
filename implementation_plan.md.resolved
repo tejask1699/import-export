@@ -1,0 +1,26 @@
+# Integrate AI for Weather & Shipping Recommendation
+
+We will replace the hardcoded Python heuristic logic for the "AI-powered shipping recommendation" with an actual AI model to provide a natural language summary of the weather alongside dynamic shipping advice. 
+
+## Proposed Changes
+
+### Backend (Python)
+#### [MODIFY] app.py
+- Install and configure `google-generativeai` (Google Gemini API). If you prefer OpenAI, we can substitute it easily.
+- Update `/api/weather/<city>` and `/api/weather/coordinates` to call the AI with the OpenWeather JSON data.
+- The prompt will ask the AI to "Provide a brief 1-2 sentence summary of the current weather and a clear shipping recommendation (Proceed, Caution, Delay, or Cancel) based on the conditions."
+- We will return the natural language AI response to the frontend rather than the static [get_shipping_recommendation(data)](file:///c:/Personal/import-export/app.py#452-546) output.
+- (Optional) We can replace or heavily modify the [get_shipping_recommendation](file:///c:/Personal/import-export/app.py#452-546) function to act as a fallback if the API fails or entirely remove it and let the LLM handle all the reasoning.
+
+### Frontend (HTML/JS)
+#### [MODIFY] templates/weather.html
+- Update the `<div id="shippingContent">` to cleanly display the AI-generated text.
+- Modify the display logic [displayShipping(s)](file:///c:/Personal/import-export/templates/weather.html#250-263) to render the custom AI summaries and recommendations instead of the static blocks.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **API Key Required:** Integrating an LLM will require an API key. I will plan to use Google's Gemini API (via `google-generativeai`). Please confirm:
+> 1. Do you want to use **Google Gemini**, or **OpenAI**?
+> 2. Could you provide the API key, or should I create a placeholder `GEMINI_API_KEY` for you to fill in later?
+> 3. Does this overall plan sound like what you had in mind?

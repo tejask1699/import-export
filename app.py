@@ -8,6 +8,10 @@ import io
 import mysql.connector
 import requests
 import json
+import os
+import google.generativeai as genai
+
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "AIzaSyCMO0I6W_cbQwVxNYFp8CqcAoRAl_hv9kU"))
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
@@ -23,7 +27,7 @@ def get_db_connection():
         host="127.0.0.1",
         port=3306,
         user="root",
-        password="Tejas@1699",
+        password="root@1699",
         database="ai_shipping",
         # charset="utf8",
         # collation="utf8_general_ci"
@@ -399,7 +403,7 @@ def get_weather(city):
         data = response.json()
         
         # Add shipping recommendation
-        shipping_recommendation = get_shipping_recommendation(data)
+        shipping_recommendation = get_ai_shipping_recommendation(data)
         
         return json.dumps({
             'success': True,
@@ -435,7 +439,7 @@ def get_weather_coordinates():
         response = requests.get(url, params=params)
         data = response.json()
         
-        shipping_recommendation = get_shipping_recommendation(data)
+        shipping_recommendation = get_ai_shipping_recommendation(data)
         
         return json.dumps({
             'success': True,
@@ -447,6 +451,50 @@ def get_weather_coordinates():
             'success': False,
             'error': str(e)
         })
+
+
+def get_ai_shipping_recommendation(weather_data):
+    """Generates AI powered shipping recommendation using Gemini."""
+    try:
+        main = weather_data['weather'][0]['main']
+        temp = weather_data['main']['temp']
+        wind_speed = weather_data['wind']['speed']
+        
+        prompt = f"""
+        You are an AI logistics expert. The current weather is {main} with a temperature of {temp}°C and wind speed of {wind_speed} m/s.
+        Provide a 1-2 sentence natural language summary of the weather. 
+        Then, provide a clear shipping action which MUST BE ONE OF: [PROCEED, CAUTION, DELAY, CANCEL].
+        Return a valid JSON object exactly like this:
+        {{
+            "recommendation": "your 1-2 sentence weather summary and advice",
+            "reason": "short explanation",
+            "action": "PROCEED" 
+        }}
+        """
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.endswith("```"):
+            text = text[:-3]
+        
+        result = json.loads(text.strip())
+        
+        # Determine risk based on action
+        action_upper = result.get('action', '').upper()
+        if action_upper == 'PROCEED':
+            result['risk'] = 'LOW'
+        elif action_upper in ['CAUTION', 'DELAY']:
+            result['risk'] = 'MEDIUM'
+        else:
+            result['risk'] = 'HIGH'
+            
+        result['suitable'] = (action_upper in ['PROCEED', 'CAUTION'])
+        return result
+    except Exception as e:
+        print(f"Gemini API error: {e}")
+        return get_shipping_recommendation(weather_data)
 
 
 def get_shipping_recommendation(weather_data):
