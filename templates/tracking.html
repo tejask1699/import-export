@@ -10,11 +10,7 @@
     <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px">
       <div>
         <label>Tracking Number</label>
-        <input
-          id="trackingNumber"
-          placeholder="Enter tracking number"
-          required
-        />
+        <input id="trackingNumber" placeholder="Enter tracking number" required />
       </div>
 
       <div>
@@ -41,16 +37,14 @@
   <div class="card">
     <h3>
       Live Map
-      <span
-        style="
+      <span style="
           margin-left: 10px;
           background: #ef4444;
           color: white;
           padding: 3px 8px;
           border-radius: 20px;
           font-size: 12px;
-        "
-      >
+        ">
         ● LIVE
       </span>
     </h3>
@@ -111,14 +105,17 @@
   .status-badge.in-transit {
     background: #facc15;
   }
+
   .status-badge.delivered {
     background: #22c55e;
     color: white;
   }
+
   .status-badge.pending {
     background: #94a3b8;
     color: white;
   }
+
   .status-badge.delayed {
     background: #ef4444;
     color: white;
@@ -166,7 +163,7 @@
 
       if (currentTrackingNumber !== newTrackingNumber) {
         currentTrackingNumber = newTrackingNumber;
-        
+
         lastExactIndex = 0;
         routeCoords = [];
         if (markers.origin) map.removeLayer(markers.origin);
@@ -231,16 +228,16 @@
       <div class="shipment-details">
         <strong>${data.origin} → ${data.destination}</strong>
         <div>Priority: ${data.priority}</div>
+        <div>Expected: ${data.expected_delivery_date || 'Pending'}</div>
         <div>ETA: ${data.eta}</div>
         <div>Progress: ${data.progress}%</div>
         <div class="status-badge ${data.status}">
           ${data.status}
         </div>
       </div>
-      ${
-        data.weather_alerts?.length
-          ? `<div class="weather-alert">⚠️ ${data.weather_alerts.join(", ")}</div>`
-          : ""
+      ${data.weather_alerts?.length
+        ? `<div class="weather-alert">⚠️ ${data.weather_alerts.join(", ")}</div>`
+        : ""
       }
     </div>
   `;
@@ -264,7 +261,7 @@
         iconSize: [40, 40],
         iconAnchor: [20, 20]
       });
-      markers.current = L.marker([origin.lat, origin.lng], {icon: truckIcon}).addTo(map);
+      markers.current = L.marker([origin.lat, origin.lng], { icon: truckIcon }).addTo(map);
     }
 
     // ✅ Fetch route only once
@@ -272,8 +269,8 @@
       try {
         const res = await fetch(
           `https://router.project-osrm.org/route/v1/driving/` +
-            `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
-            `?overview=full&geometries=geojson`,
+          `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+          `?overview=full&geometries=geojson`,
         );
 
         const routeData = await res.json();
@@ -304,7 +301,7 @@
     const startExactIndex = lastExactIndex;
 
     if (Math.abs(targetExactIndex - startExactIndex) < 0.001) {
-        return;
+      return;
     }
 
     const duration = 2000;
@@ -315,7 +312,7 @@
     function animate(time) {
       if (!startTime) startTime = time;
       const t = Math.min((time - startTime) / duration, 1);
-      
+
       const currentExactIndex = startExactIndex + (targetExactIndex - startExactIndex) * t;
 
       // Safely clamp the index just in case
@@ -326,12 +323,12 @@
 
       const p1 = routeCoords[lowerIndex];
       const p2 = routeCoords[upperIndex];
-      
+
       if (!p1 || !p2) {
-          requestAnimationFrame(animate);
-          return;
+        requestAnimationFrame(animate);
+        return;
       }
-      
+
       const lat = p1[0] + (p2[0] - p1[0]) * fraction;
       const lng = p1[1] + (p2[1] - p1[1]) * fraction;
 
@@ -340,11 +337,11 @@
       // Flip the truck icon based on travel direction (left or right)
       const el = markers.current.getElement();
       if (el) {
-          const truckIconInner = el.querySelector('.truck-icon-inner');
-          if (truckIconInner && p2[1] !== p1[1]) {
-              const dx = p2[1] - p1[1];
-              truckIconInner.style.transform = dx < 0 ? 'scaleX(-1)' : 'scaleX(1)';
-          }
+        const truckIconInner = el.querySelector('.truck-icon-inner');
+        if (truckIconInner && p2[1] !== p1[1]) {
+          const dx = p2[1] - p1[1];
+          truckIconInner.style.transform = dx < 0 ? 'scaleX(-1)' : 'scaleX(1)';
+        }
       }
 
       if (t < 1) {
@@ -398,6 +395,7 @@
       <div class="shipment-details">
         <strong>${s.origin} → ${s.destination}</strong>
         <div>Priority: ${s.priority || "-"}</div>
+        <div>Expected: ${s.expected_delivery_date ? new Date(s.expected_delivery_date).toLocaleString() : "Pending"}</div>
         <div class="status-badge ${s.status}">${s.status}</div>
       </div>
       <button class="btn" onclick="goTrack('${s.tracking_number}')">Track</button>

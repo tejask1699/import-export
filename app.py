@@ -286,13 +286,24 @@ def create_shipment():
         # ✅ Better Tracking Number (more unique)
         tracking_number = f"TRK-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(100,999)}"
 
+        from datetime import timedelta
+        BASE_DURATION = 48
+        if priority == "Urgent":
+            hours_to_add = BASE_DURATION * 0.7
+        elif priority == "Standard":
+            hours_to_add = BASE_DURATION
+        else:
+            hours_to_add = BASE_DURATION * 1.2
+            
+        expected_delivery_date = datetime.now() + timedelta(hours=hours_to_add)
+
         db_conn = get_db_connection()
         cursor = db_conn.cursor()
 
         query = """
             INSERT INTO shipments 
-            (user_id, origin, destination, payment_mode, priority, status, tracking_number)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (user_id, origin, destination, payment_mode, priority, status, tracking_number, expected_delivery_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
 
         values = (
@@ -302,7 +313,8 @@ def create_shipment():
             payment_mode,
             priority,
             'in-transit',
-            tracking_number
+            tracking_number,
+            expected_delivery_date
         )
 
         cursor.execute(query, values)
@@ -691,9 +703,9 @@ def get_tracking_data(tracking_number):
         db_conn = get_db_connection()
         cursor = db_conn.cursor(dictionary=True)
 
-        # ✅ FIX: include created_at
+        # ✅ FIX: include expected_delivery_date
         cursor.execute(
-            """SELECT origin, destination, status, created_at, priority 
+            """SELECT origin, destination, status, created_at, priority, expected_delivery_date 
                FROM shipments 
                WHERE tracking_number=%s""",
             (tracking_number,)
@@ -757,6 +769,12 @@ def get_tracking_data(tracking_number):
         minutes = int((remaining_seconds % 3600) // 60)
 
         eta = f"{hours}h {minutes}m"
+        
+        expected_del_date = shipment.get('expected_delivery_date')
+        if expected_del_date:
+            eta_date_str = expected_del_date.strftime('%b %d, %Y, %I:%M %p')
+        else:
+            eta_date_str = 'Pending'
 
         return json.dumps({
             'success': True,
@@ -769,6 +787,7 @@ def get_tracking_data(tracking_number):
             'current_coords': current_coords,
             'progress': progress,
             'eta': eta,
+            'expected_delivery_date': eta_date_str,
             'priority': priority,
             'weather_alerts': []
         })

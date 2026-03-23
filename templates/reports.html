@@ -7,12 +7,7 @@
 <div class="card" style="margin-bottom:20px;">
   <div style="display:flex; gap:10px; flex-wrap:wrap;">
 
-    <input
-      type="text"
-      id="searchInput"
-      placeholder="Search tracking / city..."
-      style="width:250px;"
-    />
+    <input type="text" id="searchInput" placeholder="Search tracking / city..." style="width:250px;" />
 
     <select id="filter" onchange="filterTable()">
       <option value="">All</option>
@@ -65,6 +60,7 @@
         <th>Route</th>
         <th>Status</th>
         <th>Date</th>
+        <th>Expected Delivery</th>
         {% if role == 'admin' %}
         <th>User</th>
         {% endif %}
@@ -79,85 +75,98 @@
 </div>
 
 <style>
-input, select {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-}
+  input,
+  select {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  }
 
-/* STATUS */
-.status {
-  padding: 5px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-}
+  /* STATUS */
+  .status {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+  }
 
-.in-transit { background:#fff3cd; color:#856404; }
-.delivered { background:#d4edda; color:#155724; }
-.delayed { background:#f8d7da; color:#721c24; }
+  .in-transit {
+    background: #fff3cd;
+    color: #856404;
+  }
 
-/* PAGINATION */
-#pagination button {
-  margin: 5px;
-  padding: 6px 12px;
-  border: none;
-  background: #e2e8f0;
-  border-radius: 6px;
-  cursor: pointer;
-}
+  .delivered {
+    background: #d4edda;
+    color: #155724;
+  }
 
-#pagination button.active {
-  background: var(--secondary);
-  color: white;
-}
+  .delayed {
+    background: #f8d7da;
+    color: #721c24;
+  }
+
+  /* PAGINATION */
+  #pagination button {
+    margin: 5px;
+    padding: 6px 12px;
+    border: none;
+    background: #e2e8f0;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  #pagination button.active {
+    background: var(--secondary);
+    color: white;
+  }
 </style>
 
 <script>
-const role = "{{ role }}";
-let currentPage = 1;
-let currentSearch = "";
-let currentStatus = "";
+  const role = "{{ role }}";
+  let currentPage = 1;
+  let currentSearch = "";
+  let currentStatus = "";
 
-document.getElementById("reportBtn")
-.addEventListener("click", () => {
-  window.open("/api/reports/pdf", "_blank");
-});
+  document.getElementById("reportBtn")
+    .addEventListener("click", () => {
+      window.open("/api/reports/pdf", "_blank");
+    });
 
-/* LOAD */
-async function loadReports(page = 1) {
-  const res = await fetch(
-    `/api/user-reports?page=${page}&limit=5&search=${currentSearch}&status=${currentStatus}`
-  );
+  /* LOAD */
+  async function loadReports(page = 1) {
+    const res = await fetch(
+      `/api/user-reports?page=${page}&limit=5&search=${currentSearch}&status=${currentStatus}`
+    );
 
-  const data = await res.json();
-  if (!data.success) return;
+    const data = await res.json();
+    if (!data.success) return;
 
-  document.getElementById("total").innerText = data.stats.total;
-  document.getElementById("inTransit").innerText = data.stats.in_transit;
-  document.getElementById("delivered").innerText = data.stats.delivered;
-  document.getElementById("delayed").innerText = data.stats.delayed;
+    document.getElementById("total").innerText = data.stats.total;
+    document.getElementById("inTransit").innerText = data.stats.in_transit;
+    document.getElementById("delivered").innerText = data.stats.delivered;
+    document.getElementById("delayed").innerText = data.stats.delayed;
 
-  renderTable(data.data);
-  renderPagination(data.pagination);
-}
-
-/* TABLE */
-function renderTable(list) {
-  const tbody = document.querySelector("#reportTable tbody");
-
-  if (!list.length) {
-    const colSpan = role === "admin" ? 6 : 5;
-    tbody.innerHTML = `<tr><td colspan="${colSpan}">No data</td></tr>`;
-    return;
+    renderTable(data.data);
+    renderPagination(data.pagination);
   }
 
-  tbody.innerHTML = list.map(s => `
+  /* TABLE */
+  function renderTable(list) {
+    const tbody = document.querySelector("#reportTable tbody");
+
+    if (!list.length) {
+      const colSpan = role === "admin" ? 6 : 5;
+      tbody.innerHTML = `<tr><td colspan="${colSpan}">No data</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = list.map(s => `
     <tr>
       <td>${s.tracking_number}</td>
       <td>${s.origin} → ${s.destination}</td>
       <td><span class="status ${s.status}">${s.status}</span></td>
       <td>${s.created_at ? new Date(s.created_at).toLocaleString() : "-"}</td>
-      ${role==="admin" ? `<td>${s.user_name || "-"}</td>` : ""}
+      <td>${s.expected_delivery_date ? new Date(s.expected_delivery_date).toLocaleString() : "Pending"}</td>
+      ${role === "admin" ? `<td>${s.user_name || "-"}</td>` : ""}
       <td>
         <button class="btn" onclick="goTrack('${s.tracking_number}')">
           Track
@@ -165,46 +174,46 @@ function renderTable(list) {
       </td>
     </tr>
   `).join("");
-}
+  }
 
-/* PAGINATION */
-function renderPagination(p) {
-  const container = document.getElementById("pagination");
+  /* PAGINATION */
+  function renderPagination(p) {
+    const container = document.getElementById("pagination");
 
-  container.innerHTML = Array.from({length:p.pages}, (_,i)=>`
-    <button class="${i+1===p.page?'active':''}" onclick="changePage(${i+1})">
-      ${i+1}
+    container.innerHTML = Array.from({ length: p.pages }, (_, i) => `
+    <button class="${i + 1 === p.page ? 'active' : ''}" onclick="changePage(${i + 1})">
+      ${i + 1}
     </button>
   `).join("");
-}
+  }
 
-function changePage(p){
-  currentPage = p;
-  loadReports(p);
-}
+  function changePage(p) {
+    currentPage = p;
+    loadReports(p);
+  }
 
-/* SEARCH */
-document.getElementById("searchInput")
-.addEventListener("input", e=>{
-  currentSearch = e.target.value;
-  loadReports(1);
-});
+  /* SEARCH */
+  document.getElementById("searchInput")
+    .addEventListener("input", e => {
+      currentSearch = e.target.value;
+      loadReports(1);
+    });
 
-/* FILTER */
-function filterTable(){
-  currentStatus = document.getElementById("filter").value;
-  loadReports(1);
-}
+  /* FILTER */
+  function filterTable() {
+    currentStatus = document.getElementById("filter").value;
+    loadReports(1);
+  }
 
-/* NAV */
-function goTrack(id){
-  window.location.href = `/tracking?tracking=${id}`;
-}
+  /* NAV */
+  function goTrack(id) {
+    window.location.href = `/tracking?tracking=${id}`;
+  }
 
-/* INIT */
-document.addEventListener("DOMContentLoaded", ()=>{
-  loadReports();
-});
+  /* INIT */
+  document.addEventListener("DOMContentLoaded", () => {
+    loadReports();
+  });
 </script>
 
 {% endblock %}
