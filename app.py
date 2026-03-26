@@ -9,9 +9,9 @@ import mysql.connector
 import requests
 import json
 import os
-import google.generativeai as genai
+from google import genai
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "AIzaSyCMO0I6W_cbQwVxNYFp8CqcAoRAl_hv9kU"))
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", "AIzaSyCMO0I6W_cbQwVxNYFp8CqcAoRAl_hv9kU"))
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
@@ -27,7 +27,7 @@ def get_db_connection():
         host="127.0.0.1",
         port=3306,
         user="root",
-        password="root@1699",
+        password="Tejas@1699",
         database="ai_shipping",
         # charset="utf8",
         # collation="utf8_general_ci"
@@ -483,8 +483,10 @@ def get_ai_shipping_recommendation(weather_data):
             "action": "PROCEED" 
         }}
         """
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt
+        )
         text = response.text.strip()
         if text.startswith("```json"):
             text = text[7:]

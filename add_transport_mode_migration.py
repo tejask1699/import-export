@@ -10,15 +10,15 @@ try:
     )
     cursor = db.cursor()
     
-    print("Adding expected_delivery_date column to shipments table...")
-    cursor.execute("ALTER TABLE shipments ADD COLUMN expected_delivery_date DATETIME;")
+    print("Adding transport_mode column to shipments table...")
+    cursor.execute("ALTER TABLE shipments ADD COLUMN transport_mode VARCHAR(50) DEFAULT 'Road';")
     
     db.commit()
     print("Column added successfully!")
     
 except mysql.connector.Error as err:
     if err.errno == 1060: # Duplicate column name
-        print("Column expected_delivery_date already exists.")
+        print("Column transport_mode already exists.")
     else:
         print(f"Error: {err}")
 finally:

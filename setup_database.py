@@ -4,10 +4,11 @@ import mysql.connector
 try:
     # Connect to MySQL without specifying database
     db = mysql.connector.connect(
-        host="127.0.0.1",
+          host="127.0.0.1",
         port=3306,
         user="root",
-        password="root@1699",
+        password="Tejas@1699",
+        database="ai_shipping",
         # charset="utf8",
         # collation="utf8_general_ci"
     )

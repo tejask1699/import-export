@@ -285,6 +285,8 @@
           [origin.lat, origin.lng],
           [destination.lat, destination.lng],
         ];
+        routeLine = L.polyline(routeCoords, { color: "#3282b8" }).addTo(map);
+        map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
       }
     }
 
